@@ -1,0 +1,385 @@
+================================================================================
+                    CAREERAI PROJECT STRUCTURE GUIDE
+================================================================================
+
+This guide explains the complete folder structure and functionality of the
+CareerAI application. Everything is organized in a clean, easy-to-understand
+way for beginners.
+
+================================================================================
+                            FOLDER STRUCTURE
+================================================================================
+
+1. src/
+   This is the main source code folder containing all application code.
+
+2. src/components/
+   Contains reusable UI components that are used across multiple pages.
+   These are building blocks like navigation bars, sidebars, and route
+   protectors.
+
+3. src/pages/
+   Contains the main page components that users see when navigating the app.
+   Each file represents a different screen/page in the application.
+
+4. src/services/
+   Contains business logic and API-related code. This is where authentication
+   and data operations are handled separately from UI components.
+
+5. src/utils/
+   Contains helper functions and utility code that can be used anywhere in
+   the app. These are small, reusable functions for common tasks.
+
+6. src/data/
+   Contains static data files in JSON format. This includes career listings
+   and profile field options.
+
+7. src/assets/
+   Contains images, icons, and other static media files used in the app.
+
+8. public/
+   Contains files that are served directly without processing, like the
+   main HTML file and public assets.
+
+9. dist/
+   Contains the built/compiled version of the app ready for deployment.
+   This is generated automatically when you run "npm run build".
+
+================================================================================
+                              FILE LISTING
+================================================================================
+
+ROOT LEVEL FILES
+----------------
+
+1. package.json
+   Functionality: Defines project dependencies and scripts
+   Part of app: Project configuration
+   Manages: Dependencies, build scripts, project metadata
+
+2. vite.config.js
+   Functionality: Configuration for Vite build tool
+   Part of app: Build system
+   Manages: Build settings, base paths, plugin configuration
+
+3. index.html
+   Functionality: Main HTML entry point for the application
+   Part of app: Application shell
+   Manages: HTML structure, React mounting point
+
+4. README.md
+   Functionality: Project documentation and instructions
+   Part of app: Documentation
+   Manages: Project overview, setup instructions
+
+5. GO_LIVE_GUIDE.md
+   Functionality: Guide for deploying the application
+   Part of app: Deployment documentation
+   Manages: Deployment instructions, hosting options
+
+
+SRC/ FOLDER FILES
+-----------------
+
+6. src/main.jsx
+   Functionality: Application entry point that starts React
+   Part of app: Application initialization
+   Manages: React setup, routing configuration, DOM mounting
+   Logic: Sets up HashRouter and renders the App component
+
+7. src/App.jsx
+   Functionality: Root component controlling entire application
+   Part of app: Application root and routing
+   Manages: Page routing, layout structure, authentication flow, admin
+            initialization
+   Logic: Routes users to different pages, manages layout for auth vs.
+          authenticated pages, initializes admin user
+
+8. src/App.css
+   Functionality: All application styles and CSS rules
+   Part of app: Styling system
+   Manages: Colors, layouts, responsive design, component styles
+   Logic: Defines visual appearance of all components and pages
+
+
+SRC/COMPONENTS/ FOLDER FILES
+-----------------------------
+
+9. src/components/Navbar.jsx
+   Functionality: Top navigation bar component
+   Part of app: Main layout navigation
+   UI location: Top of screen (sticky header)
+   Manages: Navigation links, user session display, logout functionality
+   Logic: Shows app logo, navigation links, current user name, logout button
+
+10. src/components/Sidebar.jsx
+    Functionality: Left sidebar navigation panel
+    Part of app: Main layout navigation
+    UI location: Left side of screen (on authenticated pages)
+    Manages: Profile display, completion tracking, quick navigation
+    Logic: Shows user profile summary, completion progress bar, quick links
+
+11. src/components/ProtectedRoute.jsx
+    Functionality: Security guard for protected pages
+    Part of app: Authentication and routing
+    Manages: Route protection, authentication checks, redirects
+    Logic: Checks if user is logged in, redirects to login if not
+
+
+SRC/PAGES/ FOLDER FILES
+------------------------
+
+12. src/pages/LoginPage.jsx
+    Functionality: User login page
+    Part of app: Authentication system
+    UI location: Full-screen centered login form
+    Manages: User login, authentication, session creation
+    Logic: Validates credentials, supports admin login (admin/admin),
+           redirects to home after successful login
+
+13. src/pages/SignupPage.jsx
+    Functionality: New user registration page
+    Part of app: Authentication system
+    UI location: Full-screen centered signup form
+    Manages: User registration, account creation, validation
+    Logic: Validates form inputs, checks if email address is already
+           registered, creates new account, auto-logs in user
+
+14. src/pages/ProfileQuizPage.jsx
+    Functionality: User profile creation and editing page
+    Part of app: User profile management
+    UI location: Main content area (protected route)
+    Manages: Profile creation, skill/interest selection, data persistence
+    Logic: Allows users to enter name, education, select interests and
+           skills, auto-saves to localStorage
+
+15. src/pages/CareerFeed.jsx
+    Functionality: Career recommendations home page
+    Part of app: Career recommendations system
+    UI location: Main content area (protected route, home page)
+    Manages: Career matching algorithm, saved items, recommendation display
+    Logic: Scores careers based on user profile, displays matched careers,
+           allows saving favorites
+
+
+SRC/SERVICES/ FOLDER FILES
+---------------------------
+
+16. src/services/authService.js
+    Functionality: Authentication service handling all user auth logic
+    Part of app: Authentication system
+    Manages: User accounts, login sessions, admin access
+    Logic: Handles login, registration, logout, admin initialization,
+           session management using localStorage
+    Functions:
+    - initializeAdminUser(): Creates default admin account
+    - loginUser(email, password): Authenticates user login
+    - registerUser(name, email, password, confirmPassword): Creates new account
+    - getCurrentUser(): Gets logged-in user from session
+    - logoutUser(): Removes user session
+
+
+SRC/UTILS/ FOLDER FILES
+------------------------
+
+17. src/utils/storage.js
+    Functionality: Helper functions for localStorage operations
+    Part of app: Data persistence layer
+    Manages: Local storage operations for profiles, saved items, user data
+    Logic: Provides easy-to-use functions for saving/retrieving data
+    Functions:
+    - getProfile(): Gets user profile from storage
+    - saveProfile(profile): Saves profile to storage
+    - getSavedItems(): Gets saved career items
+    - saveSavedItems(items): Saves career items
+    - getFromStorage(key, defaultValue): Generic get function
+    - saveToStorage(key, value): Generic save function
+
+18. src/utils/helpers.js
+    Functionality: General-purpose helper functions
+    Part of app: Utility functions
+    Manages: Common operations like array matching, scoring, calculations
+    Logic: Provides reusable functions for data processing
+   Functions:
+   - findOverlap(a, b): Finds common items between two arrays
+   - calculateProfileCompletion(profile): Calculates profile completion %
+   - containsAny(text, items): Checks if text contains any items
+
+19. src/utils/csv.js
+   Functionality: CSV database helper
+   Part of app: Authentication data layer
+   Manages: Reading CSV files, merging with localStorage, parsing rows, exporting data
+   Logic: Provides functions like readCSV, findUserByEmail, addUser, validateLogin
+
+20. src/utils/avatars.js
+   Functionality: Avatar image catalog and helpers
+   Part of app: User profile visuals
+   Manages: Mapping avatar file names to image URLs, selecting gender-based avatars
+   Logic: Supplies getAvatarUrl, getRandomAvatarFile, and withAvatarMetadata helpers
+
+
+SRC/DATA/ FOLDER FILES
+----------------------
+
+21. src/data/profile_fields.json
+    Functionality: Available options for profile fields
+    Part of app: Profile data
+    Manages: Lists of interests, skills, and education levels
+    Logic: Provides dropdown and button options for profile creation
+    Contains: Interests array, Skills array, Education array
+
+22. src/data/careers_bd.json
+    Functionality: Career opportunities database
+    Part of app: Career data
+    Manages: List of available career positions
+    Logic: Provides career data for matching and recommendations
+    Contains: Array of career objects with title, company, location,
+              skills, description
+
+
+SRC/ASSETS/ FOLDER FILES
+-------------------------
+
+23. src/assets/faces/
+    Functionality: Avatar image collection (JPEG files)
+    Part of app: User profile visuals
+    Manages: Male and female avatar portraits used in navbar/sidebar and CSV
+
+24. src/assets/react.svg
+    Functionality: React logo image
+    Part of app: Assets/images
+    Manages: Static image file
+
+
+PUBLIC/ FOLDER FILES
+--------------------
+
+25. public/vite.svg
+    Functionality: Vite logo/favicon
+    Part of app: Public assets
+    Manages: Favicon displayed in browser tab
+
+26. public/data/d.csv
+    Functionality: User database CSV (served to browser)
+    Part of app: Authentication data
+    Manages: User records with columns for name, email, password, gender, birth year, country, and avatar file
+
+
+================================================================================
+                         FUNCTIONALITY BREAKDOWN
+================================================================================
+
+AUTHENTICATION SYSTEM
+---------------------
+Files: LoginPage.jsx, SignupPage.jsx, authService.js, ProtectedRoute.jsx
+Purpose: Handles user login, registration, and session management
+Features:
+- Login with email address or username (admin/admin for admin access)
+- User registration with validation
+- Session management using localStorage
+- Protected routes that require login
+- Auto-login after registration
+
+PROFILE MANAGEMENT
+------------------
+Files: ProfileQuizPage.jsx, storage.js, profile_fields.json
+Purpose: Allows users to create and edit their profiles
+Features:
+- Enter name and education level
+- Select interests from predefined list
+- Select skills from predefined list
+- Auto-save to localStorage
+- Profile completion tracking
+
+CAREER RECOMMENDATIONS
+----------------------
+Files: CareerFeed.jsx, helpers.js, careers_bd.json
+Purpose: Shows personalized career recommendations
+Features:
+- Scores careers based on user profile
+- Matches skills and interests
+- Displays career details (title, company, location, description)
+- Save favorite careers
+- Shows matching score and reason
+
+NAVIGATION SYSTEM
+----------------
+Files: Navbar.jsx, Sidebar.jsx, App.jsx
+Purpose: Provides navigation and layout structure
+Features:
+- Top navigation bar with links
+- Left sidebar with profile summary
+- Quick navigation links
+- User name display
+- Logout functionality
+
+DATA PERSISTENCE
+---------------
+Files: storage.js
+Purpose: Manages data storage in browser localStorage
+Features:
+- Save/retrieve user profiles
+- Save/retrieve saved career items
+- Generic storage functions
+- Error handling
+
+================================================================================
+                         HOW PAGES CONNECT
+================================================================================
+
+1. User visits app → main.jsx starts → App.jsx loads
+
+2. If not logged in → Redirects to LoginPage.jsx
+
+3. User logs in → authService.js validates → Creates session →
+   Redirects to CareerFeed.jsx (home page)
+
+4. User can navigate:
+   - Home (CareerFeed.jsx) - See career recommendations
+   - Profile (ProfileQuizPage.jsx) - Edit profile
+   - Logout (Navbar.jsx) - Ends session, returns to login
+
+5. All authenticated pages are protected by ProtectedRoute.jsx
+
+6. Profile data is saved automatically using storage.js
+
+7. Career recommendations use helpers.js to match user profile with careers
+
+================================================================================
+                         KEY CONCEPTS
+================================================================================
+
+LOCALSTORAGE: Browser storage that saves data locally on user's computer.
+              Used for: user accounts, profiles, saved items
+
+PROTECTED ROUTES: Pages that require login. ProtectedRoute.jsx checks if
+                  user is logged in before allowing access.
+
+AUTHENTICATION: Process of verifying user identity. Handled by authService.js
+
+PROFILE MATCHING: Algorithm that scores careers based on how well they match
+                  user's skills and interests. Done in CareerFeed.jsx
+
+COMPONENTS: Reusable UI pieces. Navbar and Sidebar are used on multiple pages.
+
+SERVICES: Business logic separated from UI. authService.js handles all
+          authentication logic.
+
+UTILS: Helper functions used throughout the app. storage.js and helpers.js
+       provide common functionality.
+
+================================================================================
+                         ADMIN ACCESS
+================================================================================
+
+Default admin credentials:
+- Email/Username: admin
+- Password: admin
+
+The admin account is automatically created when the app starts.
+Admin can access all features just like regular users.
+
+================================================================================
+                         END OF GUIDE
+================================================================================
+
