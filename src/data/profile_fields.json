@@ -1,0 +1,31 @@
+{
+  "education": [
+    "HSC",
+    "Diploma",
+    "BSc",
+    "MSc",
+    "PhD"
+  ],
+  "interests": [
+    "Technology",
+    "Business",
+    "Healthcare",
+    "Education",
+    "Engineering",
+    "Design",
+    "Marketing",
+    "Finance"
+  ],
+  "skills": [
+    "JavaScript",
+    "Python",
+    "Java",
+    "React",
+    "Node.js",
+    "SQL",
+    "Machine Learning",
+    "Data Analysis",
+    "Project Management",
+    "Communication"
+  ]
+}

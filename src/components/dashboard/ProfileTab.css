@@ -1,0 +1,251 @@
+/* Profile Tab Styles with Album System */
+
+.profile-tab-container {
+  position: relative;
+}
+
+/* Save Profile Button */
+.save-profile-btn {
+  background: var(--accent);
+  color: #ffffff; /* White text for better contrast on blue */
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(81, 167, 248, 0.3);
+  transition: all 0.15s ease;
+}
+
+.save-profile-btn:hover:not(:disabled) {
+  background: var(--primary); /* Darker blue on hover */
+  color: #ffffff; /* Keep white text */
+  box-shadow: 0 4px 12px rgba(81, 167, 248, 0.4);
+}
+
+.save-profile-btn:active:not(:disabled) {
+  box-shadow: 0 1px 4px rgba(81, 167, 248, 0.3);
+}
+
+.save-profile-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--muted); /* Use muted color when disabled */
+  color: var(--text);
+}
+
+/* Profile Picture Section */
+.profile-picture-section {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1.5rem;
+}
+
+.profile-picture-container {
+  width: 120px;
+  height: 120px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.profile-picture-main,
+.profile-picture-placeholder {
+  width: 120px;
+  height: 120px;
+  border: 3px solid var(--accent);
+  transition: all 0.2s;
+}
+
+.profile-picture-placeholder {
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.profile-picture-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  color: white;
+}
+
+.profile-picture-container:hover .profile-picture-overlay {
+  opacity: 1;
+}
+
+/* Album Gallery */
+.album-gallery {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.album-thumbnail {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.album-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.album-thumbnail:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(81, 167, 248, 0.3);
+}
+
+.album-thumbnail.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(81, 167, 248, 0.2);
+}
+
+.album-badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  background: var(--accent);
+  color: #102340;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+
+/* Tag Chips */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 20px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tag-chip:hover {
+  background: var(--hover-bg);
+  border-color: var(--accent);
+}
+
+.tag-chip-active {
+  background: rgba(81, 167, 248, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.tag-remove {
+  background: transparent;
+  border: none;
+  color: currentColor;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.tag-remove:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-secondary {
+  background: var(--panel);
+  border: 1px solid var(--border); /* Theme-aware border */
+  color: var(--text);
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+:root.light-mode .btn-secondary {
+  background: #ffffff;
+  border-color: #e5e7eb;
+  color: #1f2937; /* Dark text on white */
+}
+
+:root.dark-mode .btn-secondary {
+  background: var(--panel);
+  border-color: var(--border);
+  color: var(--text); /* Light text on dark */
+}
+
+.btn-secondary:hover {
+  background: var(--hover-bg); /* Theme-aware hover */
+  border-color: var(--accent);
+  color: var(--text); /* Keep theme-aware text */
+}
+
+:root.light-mode .btn-secondary:hover {
+  background: #f1f5f9; /* Light gray hover in light mode */
+  color: #1f2937; /* Dark text */
+}
+
+:root.dark-mode .btn-secondary:hover {
+  background: #1e293b; /* Darker panel hover in dark mode */
+  color: #f1f5f9; /* Light text */
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .profile-picture-container {
+    width: 100px;
+    height: 100px;
+  }
+
+  .profile-picture-main,
+  .profile-picture-placeholder {
+    width: 100px;
+    height: 100px;
+  }
+
+  .album-grid {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .save-profile-btn {
+    padding: 0.6rem 1.5rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Ensure content doesn't get hidden */
+.card {
+  margin-top: 0; /* Remove extra margin that might cause overlap */
+}
+

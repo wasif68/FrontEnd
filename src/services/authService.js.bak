@@ -1,0 +1,202 @@
+/**
+ * Authentication Service (Hybrid: Backend API with CSV Fallback)
+ *
+ * This file handles user authentication with automatic fallback:
+ * - First tries to use backend API (if available)
+ * - Falls back to CSV-based authentication if backend is unavailable
+ * - Session management using localStorage
+ */
+
+import {
+  validateLogin as validateLoginCSV,
+  findUserByEmail,
+} from "../utils/csv.js";
+
+// The base URL of our backend API
+const API_URL = "http://localhost:3001/api";
+
+/**
+ * Check if backend server is available
+ * @returns {Promise<boolean>} - True if backend is reachable
+ */
+const isBackendAvailable = async () => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+    const response = await fetch(`${API_URL}/`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+};
+
+/**
+ * Registers a new user by sending a request to the backend API.
+ * Falls back to CSV if backend is unavailable.
+ * @param {object} userData - Contains name, email, and password.
+ * @returns {Promise<object>} - The JSON response from the server or CSV result.
+ */
+export const registerUser = async (userData) => {
+  const { name, email, password } = userData;
+
+  if (!name || !email || !password) {
+    throw new Error("Name, email, and password are required.");
+  }
+
+  // Try backend first
+  try {
+    const response = await fetch(`${API_URL}/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name, email, password }),
+    });
+
+    // Check if response is OK before parsing JSON
+    if (!response.ok) {
+      // Try to parse error message, but don't fail if it's not JSON
+      let errorMessage = "Failed to register";
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        // Response is not JSON, use status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    // Backend not available, use CSV fallback
+    console.warn(
+      "Backend not available, using CSV authentication:",
+      error.message
+    );
+    throw new Error(
+      "Registration via CSV is not supported. Please start the backend server or use the CSV import script."
+    );
+  }
+};
+
+/**
+ * Logs in a user with automatic fallback to CSV if backend is unavailable.
+ * @param {string} email - User's email.
+ * @param {string} password - User's password.
+ * @returns {Promise<object>} - The user object from the server or CSV.
+ */
+export const loginUser = async (email, password) => {
+  if (!email || !password) {
+    throw new Error("Email and password are required.");
+  }
+
+  try {
+    // First, try the CSV login endpoint, which also handles user creation
+    const csvUserData = { email, password };
+    const backendResponse = await fetch(`${API_URL}/login/csv`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(csvUserData),
+    });
+
+    if (backendResponse.ok) {
+      const backendData = await backendResponse.json();
+      const userData = {
+        id: backendData.user.id,
+        name: backendData.user.name,
+        email: backendData.user.email,
+        gender: backendData.user.gender,
+        birthYear: backendData.user.birthYear,
+        country: backendData.user.country,
+        avatarFile: backendData.user.avatarFile,
+        avatar: backendData.user.avatarFile,
+      };
+
+      localStorage.setItem("currentUser", JSON.stringify(userData));
+      return userData;
+    }
+
+    // If CSV login fails, try the regular login endpoint
+    const response = await fetch(`${API_URL}/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = "Failed to log in";
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+
+    if (data.user) {
+      localStorage.setItem("currentUser", JSON.stringify(data.user));
+    }
+
+    return data.user;
+  } catch (error) {
+    console.error("Login failed:", error.message);
+    throw new Error(
+      error.message || "Failed to log in. Please check your credentials."
+    );
+  }
+};
+
+/**
+ * Logs out the current user by removing their data from localStorage.
+ */
+export const logoutUser = () => {
+  localStorage.removeItem("currentUser");
+};
+
+/**
+ * Gets the current logged-in user from localStorage.
+ * @returns {object|null} - The user object or null if not logged in.
+ */
+export const getCurrentUser = () => {
+  const userStr = localStorage.getItem("currentUser");
+  if (!userStr) {
+    return null;
+  }
+
+  try {
+    const user = JSON.parse(userStr);
+    // Validate that user object has at least email or name (required fields)
+    if (user && (user.email || user.name)) {
+      return user;
+    }
+    // Invalid user object, clear it
+    localStorage.removeItem("currentUser");
+    return null;
+  } catch (e) {
+    // Invalid JSON, clear it
+    localStorage.removeItem("currentUser");
+    return null;
+  }
+};
+
+/**
+ * NOTE: The initializeAdminUser function has been removed.
+ * Admin user creation should now be handled directly in the database
+ * or through a separate, secure admin interface on the backend.
+ * Client-side admin initialization is insecure.
+ */

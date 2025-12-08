@@ -1,0 +1,91 @@
+.sidebar {
+  width: 280px;
+  padding: 1.5rem;
+  background: var(--panel);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(20, 26, 42, 0.1);
+  transition: background-color 0.3s;
+}
+
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.profile-card img {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  object-fit: cover;
+}
+
+.profile-info {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.profile-subtext {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin-top: 0.25rem;
+}
+
+.sidebar .card {
+  background: var(--card);
+  padding: 1.5rem;
+  border-radius: 0.875rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+:root.light-mode .sidebar .card {
+  border-color: #e5e7eb;
+}
+
+.progress-bar-container {
+  height: 8px;
+  background: var(--border);
+  border-radius: 8px;
+  margin-top: 0.625rem;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 8px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.quick-links {
+  margin-top: 0.625rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quick-links .link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.quick-links .link:hover {
+  background: rgba(81, 167, 248, 0.1);
+  transform: translateX(4px);
+}
+
+/* Responsive - Sidebar already hidden on mobile via App.css grid */

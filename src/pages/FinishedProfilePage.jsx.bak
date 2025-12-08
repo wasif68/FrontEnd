@@ -1,0 +1,376 @@
+/**
+ * Finished Profile Page
+ * 
+ * Displays user's complete profile information including:
+ * - Personal information and profile image
+ * - Enrolled courses with status (completed/in-progress)
+ * - Applied or saved jobs with status and date
+ * - Tabs to switch between courses and jobs
+ */
+
+import { useEffect, useState } from "react";
+import { useUserData } from "../contexts/UserDataContext";
+import { getCurrentUser } from "../services/authService";
+import { getAvatarUrl } from "../utils/avatars";
+import ErrorBoundary from "../components/ErrorBoundary";
+import "./FinishedProfilePage.css";
+
+const API_URL = "http://localhost:3001/api";
+
+export default function FinishedProfilePage() {
+  const currentUser = getCurrentUser();
+  const { refreshUserData } = useUserData();
+  const [activeTab, setActiveTab] = useState("courses"); // 'courses' or 'jobs'
+  const [profileData, setProfileData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadProfileData = async () => {
+      // Check if user has ID (backend user) or only name (CSV user)
+      if (!currentUser) {
+        setError("User not found. Please log in.");
+        setLoading(false);
+        return;
+      }
+
+      // Check if user has a valid numeric ID (database ID)
+      // CSV users should now have numeric IDs after auto-creation on login
+      if (!currentUser.id || (isNaN(Number(currentUser.id)) && currentUser.id.includes('@'))) {
+        // Legacy CSV user without DB entry - they need to log out and back in
+        // The backend will auto-create their account on next login
+        setError("LEGACY_CSV_USER");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log("Fetching profile data for user ID:", currentUser.id);
+        const url = `${API_URL}/user/${currentUser.id}/profile/complete`;
+        console.log("Fetch URL:", url);
+        
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        
+        console.log("Response status:", response.status, response.statusText);
+        
+        if (!response.ok) {
+          let errorMessage = `Failed to load profile data (${response.status})`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorData.error || errorMessage;
+            console.error("Error response data:", errorData);
+          } catch (parseError) {
+            const text = await response.text().catch(() => "");
+            console.error("Error response text:", text);
+            errorMessage = text || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+        console.log("Profile data received:", data);
+        
+        // Handle both response formats: { status, message, data } or direct data
+        const profileData = data.data || data;
+        
+        if (!profileData) {
+          throw new Error("No profile data received from server");
+        }
+        
+        // Validate that we have at least user info or some data
+        if (!profileData.user && !profileData.appliedJobs && !profileData.enrolledCourses && !profileData.savedJobs && !profileData.savedCourses) {
+          console.warn("Profile data appears empty:", profileData);
+          // Still set it - might be a new user with no data yet
+        }
+        
+        setProfileData(profileData);
+        refreshUserData(); // Refresh context to sync state
+      } catch (err) {
+        console.error("Error loading profile data:", err);
+        // Provide more specific error messages
+        let errorMessage = err.message || "Failed to load profile data";
+        
+        if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
+          errorMessage = "Cannot connect to backend server. Please ensure the backend is running on port 3001.";
+        } else if (err.message.includes("404")) {
+          errorMessage = "User profile not found. Please ensure you are logged in with a registered account.";
+        } else if (err.message.includes("500")) {
+          errorMessage = "Server error. Please check the backend logs.";
+        }
+        
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfileData();
+  }, [currentUser?.id, refreshUserData]);
+
+  if (loading) {
+    return (
+      <div className="finished-profile-container">
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error === "LEGACY_CSV_USER") {
+    return (
+      <div className="finished-profile-container">
+        <div className="error-state" style={{ maxWidth: "600px", margin: "0 auto" }}>
+          <h2>Account Migration Required</h2>
+          <p style={{ fontSize: "1.1rem", marginBottom: "1.5rem" }}>
+            Your account needs to be migrated to the database. This will happen automatically when you log in again.
+          </p>
+          <div style={{ 
+            padding: "1.5rem", 
+            background: "var(--panel)", 
+            borderRadius: "0.75rem",
+            border: "1px solid var(--border)",
+            marginBottom: "1.5rem"
+          }}>
+            <p style={{ fontSize: "0.95rem", color: "var(--muted)", marginBottom: "1rem" }}>
+              <strong>To fix this:</strong>
+            </p>
+            <ol style={{ fontSize: "0.95rem", color: "var(--muted)", margin: 0, paddingLeft: "1.5rem", lineHeight: "1.8" }}>
+              <li>Click the Logout button in the navbar</li>
+              <li>Log in again with your CSV credentials</li>
+              <li>Your account will be automatically created in the database</li>
+              <li>You'll then have full access to all profile features</li>
+            </ol>
+          </div>
+          <button
+            onClick={() => window.location.href = "/dashboard"}
+            style={{
+              padding: "0.75rem 2rem",
+              background: "var(--accent)",
+              color: "white",
+              border: "none",
+              borderRadius: "0.5rem",
+              fontSize: "1rem",
+              fontWeight: "500",
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || (!profileData && !loading)) {
+    return (
+      <div className="finished-profile-container">
+        <div className="error-state">
+          <h2>Error Loading Profile</h2>
+          <p>{error || "Failed to load profile data"}</p>
+          {(error && (error.includes("backend") || error.includes("connect") || error.includes("Cannot connect"))) && (
+            <div style={{ marginTop: "1rem", padding: "1rem", background: "var(--panel)", borderRadius: "0.5rem" }}>
+              <p style={{ fontSize: "0.9rem", color: "var(--muted)", marginBottom: "0.5rem" }}>
+                <strong>Troubleshooting:</strong>
+              </p>
+              <ul style={{ fontSize: "0.9rem", color: "var(--muted)", margin: 0, paddingLeft: "1.5rem" }}>
+                <li>Make sure the backend server is running on port 3001</li>
+                <li>Verify the backend API is accessible at http://localhost:3001/api</li>
+                <li>Try refreshing the page</li>
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Safely destructure with defaults
+  const user = profileData?.user || {};
+  const enrolledCourses = profileData?.enrolledCourses || [];
+  const savedCourses = profileData?.savedCourses || [];
+  const appliedJobs = profileData?.appliedJobs || [];
+  const savedJobs = profileData?.savedJobs || [];
+  const avatarSrc = user?.avatarFile 
+    ? getAvatarUrl(user.avatarFile) 
+    : currentUser?.avatar 
+    ? getAvatarUrl(currentUser.avatar) 
+    : "https://i.pravatar.cc/150";
+
+  return (
+    <ErrorBoundary message="An error occurred loading your profile. Please try refreshing.">
+      <div className="finished-profile-container">
+        {/* Profile Header */}
+        <div className="profile-header">
+          <div className="profile-image-container">
+            <img src={avatarSrc} alt="Profile" className="profile-image" />
+          </div>
+          <div className="profile-info">
+            <h1 className="profile-name">{user?.name || currentUser?.name || "User"}</h1>
+            <p className="profile-email">{user?.email || currentUser?.email || ""}</p>
+            {user?.country && (
+              <p className="profile-location">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                  <circle cx="12" cy="10" r="3"/>
+                </svg>
+                {user.country}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="profile-tabs">
+          <button
+            className={`tab-button ${activeTab === "courses" ? "active" : ""}`}
+            onClick={() => setActiveTab("courses")}
+          >
+            Courses ({enrolledCourses?.length || 0} enrolled, {savedCourses?.length || 0} saved)
+          </button>
+          <button
+            className={`tab-button ${activeTab === "jobs" ? "active" : ""}`}
+            onClick={() => setActiveTab("jobs")}
+          >
+            Jobs ({appliedJobs?.length || 0} applied, {savedJobs?.length || 0} saved)
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        <div className="tab-content">
+          {activeTab === "courses" && (
+            <div className="courses-section">
+              {/* Enrolled Courses */}
+              {enrolledCourses && enrolledCourses.length > 0 ? (
+                <div className="section">
+                  <h2 className="section-title">Enrolled Courses</h2>
+                  <div className="items-grid">
+                    {enrolledCourses.map((course) => (
+                      <div key={course.id} className="item-card">
+                        <h3 className="item-title">{course.title}</h3>
+                        <p className="item-provider">{course.provider}</p>
+                        <p className="item-location">{course.location}</p>
+                        {course.description && (
+                          <p className="item-description">{course.description}</p>
+                        )}
+                        <div className="item-meta">
+                          <span className={`status-badge ${course.status === "completed" ? "completed" : "in-progress"}`}>
+                            {course.status === "completed" ? "Completed" : "In Progress"}
+                          </span>
+                          {course.progress !== undefined && (
+                            <span className="progress-text">Progress: {course.progress}%</span>
+                          )}
+                          <span className="date-text">
+                            Enrolled: {new Date(course.enrolled_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <p>No enrolled courses yet.</p>
+                </div>
+              )}
+
+              {/* Saved Courses */}
+              {savedCourses && savedCourses.length > 0 && (
+                <div className="section">
+                  <h2 className="section-title">Saved Courses</h2>
+                  <div className="items-grid">
+                    {savedCourses.map((course) => (
+                      <div key={course.id} className="item-card">
+                        <h3 className="item-title">{course.title}</h3>
+                        <p className="item-provider">{course.provider}</p>
+                        <p className="item-location">{course.location}</p>
+                        {course.description && (
+                          <p className="item-description">{course.description}</p>
+                        )}
+                        <div className="item-meta">
+                          <span className="date-text">
+                            Saved: {new Date(course.saved_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "jobs" && (
+            <div className="jobs-section">
+              {/* Applied Jobs */}
+              {appliedJobs && appliedJobs.length > 0 ? (
+                <div className="section">
+                  <h2 className="section-title">Applied Jobs</h2>
+                  <div className="items-grid">
+                    {appliedJobs.map((job) => (
+                      <div key={job.id} className="item-card">
+                        <h3 className="item-title">{job.title}</h3>
+                        <p className="item-company">{job.company}</p>
+                        <p className="item-location">{job.location}</p>
+                        {job.description && (
+                          <p className="item-description">{job.description}</p>
+                        )}
+                        <div className="item-meta">
+                          <span className={`status-badge ${job.status}`}>
+                            {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                          </span>
+                          <span className="date-text">
+                            Applied: {new Date(job.applied_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <p>No applied jobs yet.</p>
+                </div>
+              )}
+
+              {/* Saved Jobs */}
+              {savedJobs && savedJobs.length > 0 && (
+                <div className="section">
+                  <h2 className="section-title">Saved Jobs</h2>
+                  <div className="items-grid">
+                    {savedJobs.map((job) => (
+                      <div key={job.id} className="item-card">
+                        <h3 className="item-title">{job.title}</h3>
+                        <p className="item-company">{job.company}</p>
+                        <p className="item-location">{job.location}</p>
+                        {job.description && (
+                          <p className="item-description">{job.description}</p>
+                        )}
+                        <div className="item-meta">
+                          <span className="date-text">
+                            Saved: {new Date(job.saved_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </ErrorBoundary>
+  );
+}
+

@@ -1,0 +1,751 @@
+/* ============================================
+   CSS VARIABLES & ROOT STYLES - Modernized
+   ============================================ */
+:root {
+  /* Light Mode (Default) - Modern, clean palette */
+  --bg: #ffffff;
+  --panel: #f8fafc;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #3b82f6;
+  --primary: #2563eb;
+  --border: #e2e8f0;
+  --hover-bg: #f1f5f9;
+  --success: #10b981;
+  --success-bg: #d1fae5; /* Light green background for success messages */
+  --success-border: #a7f3d0; /* Light green border for success messages */
+  --error: #ef4444; /* Red for error/danger buttons */
+  --error-bg: #fee2e2; /* Light red background for error messages */
+  --error-border: #fecaca; /* Light red border for error messages */
+  --warning: #f59e0b;
+}
+
+/* Dark Mode - Modern dark palette */
+:root.dark-mode,
+:root.dark {
+  --bg: #0f172a;
+  --panel: #1e293b;
+  --card: #1e293b;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --accent: #60a5fa;
+  --primary: #3b82f6;
+  --border: #334155;
+  --hover-bg: #1e293b;
+  --success: #34d399;
+  --success-bg: #064e3b; /* Dark green background for success messages */
+  --success-border: #065f46; /* Dark green border for success messages */
+  --error: #f87171; /* Lighter red for dark mode */
+  --error-bg: #7f1d1d; /* Dark red background for error messages */
+  --error-border: #991b1b; /* Dark red border for error messages */
+  --warning: #fbbf24;
+}
+
+/* Light Mode (explicit) */
+:root.light-mode,
+:root.light {
+  --bg: #ffffff;
+  --panel: #f8fafc;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #3b82f6;
+  --primary: #2563eb;
+  --border: #e2e8f0;
+  --hover-bg: #f1f5f9;
+  --error: #ef4444;
+  --error-bg: #fee2e2;
+  --error-border: #fecaca;
+  --success-bg: #d1fae5;
+  --success-border: #a7f3d0;
+}
+
+/* ============================================
+   BASE ELEMENT STYLES - Enhanced transitions
+   ============================================ */
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth transitions for theme-aware elements only */
+.card,
+.panel,
+.navbar,
+.sidebar,
+.input,
+.select,
+.btn,
+[class*="card"],
+[class*="panel"] {
+  transition: background-color 0.15s ease, color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+/* Faster transitions for interactive elements */
+button,
+a,
+input,
+select,
+textarea {
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: #535bf2;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: var(--panel); /* Theme-aware instead of hardcoded dark */
+  color: var(--text); /* Theme-aware text color */
+  cursor: pointer;
+  transition: border-color 0.25s, background-color 0.2s, color 0.2s;
+}
+
+button:hover {
+  background-color: var(--hover-bg); /* Theme-aware hover */
+  border-color: var(--accent);
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+/* ============================================
+   APP LAYOUT
+   ============================================ */
+.app-shell {
+  width: 100vw; /* important: let navbar stretch FULL width */
+  min-height: 100vh;
+  background: var(--bg);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Remove duplicate navbar styles if they exist here */
+/* Keep only the ones in Navbar.css */
+
+.app-body {
+  display: grid;
+  grid-template-columns: 240px 1fr 320px;
+  gap: 20px;
+  margin-top: 88px; /* 64px navbar + 24px spacing */
+  margin-bottom: 24px;
+  padding: 0 26px;
+  max-width: 1300px;
+  box-sizing: border-box;
+}
+
+/* For dashboard pages, override the grid layout */
+.dashboard-container {
+  width: 100%;
+  margin-top: 0; /* Dashboard handles its own spacing */
+}
+
+.sidebar {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 16px;
+  height: fit-content;
+  box-shadow: 0 2px 8px rgba(20, 26, 42, 0.1);
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.app-right {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+/* ============================================
+   CARD COMPONENTS
+   ============================================ */
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: 0 1px 6px rgba(20, 26, 42, 0.08);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+:root.light-mode .card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-color: #e5e7eb;
+  background: #ffffff;
+}
+
+:root.dark-mode .card {
+  background: var(--card);
+  border-color: transparent;
+}
+
+.tip-card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 18px;
+  font-size: 16px;
+}
+
+.profile-card {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.profile-card img {
+  border-radius: 999px;
+  width: 54px;
+  height: 54px;
+}
+
+/* ============================================
+   FEED & CONTENT
+   ============================================ */
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 0;
+  margin: 0;
+}
+
+.tags {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  background: var(--panel);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 5px 13px;
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+/* ============================================
+   BUTTONS & LINKS
+   ============================================ */
+.btn {
+  background: var(--panel);
+  border: 1px solid var(--border); /* Use theme-aware border */
+  color: var(--text);
+  padding: 0.625rem 1.125rem;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn:hover {
+  background: var(--hover-bg); /* Theme-aware hover */
+  border-color: var(--accent);
+  transform: scale(1.02);
+}
+
+:root.light-mode .btn:hover {
+  background: #f1f5f9; /* Light gray for light mode */
+}
+
+:root.dark-mode .btn:hover {
+  background: #1e293b; /* Darker panel for dark mode */
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn.primary {
+  background: var(--accent);
+  /* Use white text on light backgrounds, dark text on dark backgrounds */
+  color: #ffffff; /* White text for better contrast on blue */
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+:root.light-mode .btn.primary {
+  color: #ffffff; /* White text on blue in light mode */
+}
+
+:root.dark-mode .btn.primary {
+  color: #ffffff; /* White text on blue in dark mode */
+}
+
+.btn.primary:hover {
+  background: var(--primary); /* Darker blue on hover */
+  color: #ffffff; /* Keep white text */
+  transform: scale(1.02);
+}
+
+.btn.primary:active {
+  transform: scale(0.98);
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+/* ============================================
+   FORMS
+   ============================================ */
+.inline {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Tailwind-like utility classes */
+.space-y-6 > * + * {
+  margin-top: 1.5rem;
+}
+
+.mb-6 {
+  margin-bottom: 1.5rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.mb-3 {
+  margin-bottom: 0.75rem;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+
+.p-6 {
+  padding: 1.5rem;
+}
+
+.text-2xl {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+.text-md {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-muted {
+  color: var(--muted);
+}
+
+/* Error message styling */
+.error-message {
+  background: var(--error-bg);
+  color: var(--error);
+  border: 1px solid var(--error-border);
+}
+
+/* Success message styling */
+.success-message {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+.gap-6 {
+  gap: 1.5rem;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.rounded-full {
+  border-radius: 9999px;
+}
+
+.object-cover {
+  object-fit: cover;
+}
+
+.hidden {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .sm\:flex-row {
+    flex-direction: row;
+  }
+}
+
+/* Additional utility classes for ProfileTab */
+.min-h-\[120px\] {
+  min-height: 120px;
+}
+
+.resize-y {
+  resize: vertical;
+}
+
+.font-inherit {
+  font-family: inherit;
+}
+
+/* Transform utilities for 3D effects */
+.transform {
+  transform: translateZ(0);
+}
+
+.hover\:scale-105:hover {
+  transform: scale(1.05);
+}
+
+.active\:scale-95:active {
+  transform: scale(0.95);
+}
+
+.active\:shadow-md:active {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.hover\:scale-110:hover {
+  transform: scale(1.1);
+}
+
+.hover\:scale-102:hover {
+  transform: scale(1.02);
+}
+
+.hover\:scale-105:hover {
+  transform: scale(1.05);
+}
+
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.duration-150 {
+  transition-duration: 150ms;
+}
+
+.ease-in-out {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Positioning utilities */
+.relative {
+  position: relative;
+}
+
+.absolute {
+  position: absolute;
+}
+
+.inset-0 {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.opacity-0 {
+  opacity: 0;
+}
+
+.group:hover .profile-picture-overlay {
+  opacity: 1;
+}
+
+/* Additional spacing */
+.gap-6 {
+  gap: 1.5rem;
+}
+
+/* Justify utilities */
+.justify-center {
+  justify-content: center;
+}
+
+/* Allow flex children to shrink inside cards */
+.inline > * {
+  min-width: 0;
+}
+
+.input,
+.select {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 15px;
+  transition: border-color 0.2s;
+}
+
+:root.light-mode .input,
+:root.light-mode .select {
+  border-color: #e5e7eb;
+  background: #ffffff;
+  color: #374151;
+}
+
+:root.light-mode .input:disabled {
+  background: #f9fafb;
+  color: #374151;
+  opacity: 0.7;
+}
+
+:root.dark-mode .input,
+:root.dark-mode .select {
+  background: var(--card);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* Prevent inputs from overflowing cards */
+.card input,
+.card .input {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Smaller input fields for auth pages */
+.app-body.auth-page .card input[type="text"],
+.app-body.auth-page .card input[type="email"],
+.app-body.auth-page .card input[type="password"],
+.app-body.auth-page .card .input {
+  padding: 6px 10px !important;
+  font-size: 13px !important;
+  height: auto !important;
+  line-height: 1.4;
+  min-height: 32px;
+}
+
+/* Reduce form spacing on auth pages */
+.app-body.auth-page .card .form {
+  gap: 12px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ============================================
+   AUTH PAGES (LOGIN/SIGNUP)
+   ============================================ */
+/* Center login/signup pages when navbar/sidebar are hidden */
+.app-body.auth-page {
+  max-width: 500px;
+  margin: 0 auto;
+  grid-template-columns: 1fr;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.app-body.auth-page .app-main {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+/* Enhanced card styling for auth pages */
+.app-body.auth-page .card {
+  max-width: 380px;
+  width: 100%;
+  margin: 40px auto;
+  padding: 24px;
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.25);
+}
+
+/* Center body and root for auth pages */
+.app-shell.auth-shell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: var(--bg);
+  width: 100vw;
+}
+
+.app-shell.auth-shell .app-body {
+  background: var(--bg);
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+@media (max-width: 1050px) {
+  .app-body {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 0 1rem;
+    max-width: 100vw;
+  }
+  .sidebar,
+  .app-right {
+    display: none;
+  }
+  .navbar {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+@media (max-width: 650px) {
+  .navbar {
+    flex-direction: column;
+    height: auto;
+    padding: 8px 8px;
+  }
+  .app-body {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* ============================================
+   LIGHT MODE SUPPORT (if needed)
+   ============================================ */
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}
+
+/* Profile Tab Styles with Album System */
+
+.profile-tab-container {
+  position: relative;
+}
+
+/* Ensure content doesn't get hidden */
+.card {
+  margin-top: 0; /* Remove extra margin that might cause overlap */
+}

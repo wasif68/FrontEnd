@@ -1,0 +1,29 @@
+<!--
+  App entry HTML.
+  - The <div id="root"></div> is where React mounts.
+  - Favicon and script use relative paths so Live Server can serve it from any folder.
+-->
+<!-- This is the main web page where React attaches. -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>frontend</title>
+    <!-- Always set dark mode BEFORE React loads -->
+    <script>
+      (function () {
+        const root = document.documentElement;
+        // Remove all theme classes first
+        root.classList.remove("light-mode", "dark-mode", "light", "dark");
+        // Always apply dark mode
+        root.classList.add("dark-mode", "dark");
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.jsx"></script>
+  </body>
+</html>

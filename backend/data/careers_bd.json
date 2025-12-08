@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "title": "Software Engineer",
+    "company": "Dhaka Tech Ltd",
+    "location": "Dhaka",
+    "skills": ["JavaScript", "React", "Node.js", "SQL"],
+    "description": "Build and maintain web applications for local and international clients."
+  },
+  {
+    "id": 2,
+    "title": "Data Analyst",
+    "company": "FinServe Bangladesh",
+    "location": "Dhaka/Remote",
+    "skills": ["Python", "SQL", "Power BI"],
+    "description": "Analyze datasets, build dashboards, and support decision-making."
+  },
+  {
+    "id": 3,
+    "title": "Machine Learning Engineer",
+    "company": "AI Labs BD",
+    "location": "Chattogram",
+    "skills": ["Python", "Machine Learning", "TensorFlow", "SQL"],
+    "description": "Train and deploy ML models; collaborate with product teams."
+  },
+  {
+    "id": 4,
+    "title": "Network Engineer",
+    "company": "BDNet",
+    "location": "Dhaka",
+    "skills": ["Networking", "AWS"],
+    "description": "Maintain network infrastructure and cloud connectivity."
+  },
+  {
+    "id": 5,
+    "title": "Embedded Systems Engineer",
+    "company": "IoTWorks BD",
+    "location": "Dhaka",
+    "skills": ["C/C++", "Embedded Systems", "MATLAB"],
+    "description": "Design firmware and test IoT hardware products."
+  }
+]

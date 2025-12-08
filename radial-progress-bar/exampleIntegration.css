@@ -1,0 +1,71 @@
+/**
+ * exampleIntegration.css
+ */
+.widget-container {
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+  background-color: #282c34;
+  color: white;
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 500px;
+  margin: 2rem auto;
+  box-shadow: 0 4px B 12px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.4s ease-in-out;
+}
+
+/* Add a loading state for smooth refresh */
+.widget-container.loading {
+  opacity: 0.6;
+  pointer-events: none; /* Disable clicks while loading */
+}
+
+.widget-title {
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.warning-messages {
+  background-color: rgba(255, 187, 40, 0.1);
+  color: #FFBB28;
+  padding: 0.5rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.9em;
+}
+
+.progress-chart-container {
+  margin-bottom: 1rem;
+}
+
+.refresh-button {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  background-color: #0088FE;
+  color: white;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background-color: #006acb;
+  transform: translateY(-2px);
+}
+
+.refresh-button:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #ff8a8a;
+  background-color: rgba(255, 0, 0, 0.1);
+  padding: 1rem;
+  border-radius: 8px;
+}

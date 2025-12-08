@@ -1,0 +1,68 @@
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.feed .card {
+  background-color: var(--card);
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+}
+
+.feed .card h2 {
+  margin: 0;
+}
+
+.feed .card h3 {
+  margin: 4px 0;
+}
+
+.job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.job-title {
+  margin: 4px 0;
+}
+
+.job-meta {
+  color: var(--muted);
+}
+
+.job-score {
+  color: var(--muted);
+}
+
+.job-description {
+  margin-top: 9px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.tag {
+  background-color: var(--panel);
+  color: var(--text);
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.reason {
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 14px;
+}

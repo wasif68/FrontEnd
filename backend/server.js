@@ -1,0 +1,1151 @@
+const express = require("express");
+const cors = require("cors");
+const db = require("./database"); // Import database connection
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
+
+const app = express();
+const port = process.env.PORT || 3100; // Port for the backend server
+const BASE_URL = process.env.BASE_URL || "http://localhost:5173";
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
+
+// Middleware
+app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' })); // Enable Cross-Origin Resource Sharing
+app.use(express.json()); // Parse JSON request bodies
+
+// Standardized response helper
+const sendResponse = (res, status, message, data = null, error = null) => {
+  const response = { status, message };
+  if (data !== null) response.data = data;
+  if (error !== null) response.error = error;
+  return res.status(status === "success" ? 200 : status).json(response);
+};
+
+// --- API ROUTES ---
+
+// A simple test route
+app.get("/", (req, res) => {
+  res.send("Hello from the CareerAI backend!");
+});
+
+// Get All Careers Route
+app.get("/api/careers", (req, res) => {
+  const sql = "SELECT * FROM careers";
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ message: "Database error", error: err.message });
+    }
+    // Parse the skills string back into an array for each career
+    const careers = rows.map((career) => ({
+      ...career,
+      skills: JSON.parse(career.skills || "[]"),
+    }));
+    res.status(200).json(careers);
+  });
+});
+
+// Get Profile Fields Route
+app.get("/api/profile-fields", (req, res) => {
+  const fs = require("fs");
+  const path = require("path");
+  const filePath = path.join(__dirname, "data", "profile_fields.json");
+
+  fs.readFile(filePath, "utf8", (err, data) => {
+    if (err) {
+      return res.status(500).json({
+        message: "Error reading profile fields file",
+        error: err.message,
+      });
+    }
+    res.status(200).json(JSON.parse(data));
+  });
+});
+
+// User Registration Route
+app.post("/api/register", async (req, res) => {
+  const { name, email, password } = req.body;
+
+  if (!name || !email || !password) {
+    return res
+      .status(400)
+      .json({ message: "Please provide name, email, and password." });
+  }
+
+  // Check if user already exists
+  db.get(
+    "SELECT email FROM users WHERE email = ?",
+    [email],
+    async (err, row) => {
+      if (err) {
+        return res
+          .status(500)
+          .json({ message: "Database error", error: err.message });
+      }
+      if (row) {
+        return res
+          .status(400)
+          .json({ message: "User with this email already exists." });
+      }
+
+      // Hash the password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
+      // Insert new user into the database
+      const sql = "INSERT INTO users (name, email, password) VALUES (?, ?, ?)";
+      db.run(sql, [name, email, hashedPassword], function (err) {
+        if (err) {
+          return res.status(500).json({
+            message: "Database error on user creation",
+            error: err.message,
+          });
+        }
+
+        const userId = this.lastID;
+
+        // Initialize empty user profile for new user
+        const profileSql =
+          "INSERT INTO user_profiles (user_id, education, interests, skills_selected, completion_percentage) VALUES (?, ?, ?, ?, ?)";
+        db.run(profileSql, [userId, null, "[]", "[]", 0], (profileErr) => {
+          if (profileErr) {
+            console.error("Error creating user profile:", profileErr.message);
+            // Still return success even if profile creation fails
+          }
+          res
+            .status(201)
+            .json({ message: "User registered successfully", userId: userId });
+        });
+      });
+    }
+  );
+});
+
+// User Login Route
+app.post("/api/login", (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res
+      .status(400)
+      .json({ message: "Please provide email and password." });
+  }
+
+  const sql = "SELECT * FROM users WHERE email = ?";
+  db.get(sql, [email], async (err, user) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ message: "Database error", error: err.message });
+    }
+    if (!user) {
+      return res.status(400).json({ message: "Invalid credentials." });
+    }
+
+    // Compare provided password with stored hashed password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials." });
+    }
+
+    // Don't send the password back to the client
+    const { password: _, ...userWithoutPassword } = user;
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        id: user.id, 
+        email: user.email,
+        name: user.name 
+      }, 
+      JWT_SECRET, 
+      { expiresIn: '24h' }
+    );
+
+    res
+      .status(200)
+      .json({ 
+        message: "Login successful", 
+        user: userWithoutPassword,
+        token: token 
+      });
+  });
+});
+
+
+
+// --- USER PROFILE ROUTES ---
+
+// Get User Profile Route
+app.get("/api/user/:id/profile", (req, res) => {
+  const { id } = req.params;
+  const sql = `
+    SELECT
+      u.id, u.name, u.email, u.gender, u.birthYear, u.country, u.avatarFile,
+      p.education, p.interests, p.skills_selected, p.completion_percentage
+    FROM users u
+    LEFT JOIN user_profiles p ON u.id = p.user_id
+    WHERE u.id = ?
+  `;
+
+  db.get(sql, [id], (err, row) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ message: "Database error", error: err.message });
+    }
+    if (!row) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.status(200).json(row);
+  });
+});
+
+// Update User Profile Route
+app.put("/api/user/:id/profile", (req, res) => {
+  const { id } = req.params;
+  const { name, education, interests, skills_selected, avatarFile } = req.body;
+
+  // Update users table
+  const userSql = "UPDATE users SET name = ?, avatarFile = ? WHERE id = ?";
+  db.run(userSql, [name, avatarFile, id], function (err) {
+    if (err) {
+      return res
+        .status(500)
+        .json({ message: "Error updating user", error: err.message });
+    }
+
+    // Check if profile exists
+    const profileCheckSql =
+      "SELECT user_id FROM user_profiles WHERE user_id = ?";
+    db.get(profileCheckSql, [id], (err, row) => {
+      if (err) {
+        return res
+          .status(500)
+          .json({ message: "Database error", error: err.message });
+      }
+
+      const interestsStr = JSON.stringify(interests);
+      const skillsStr = JSON.stringify(skills_selected);
+
+      if (row) {
+        // Update existing profile
+        const profileSql =
+          "UPDATE user_profiles SET education = ?, interests = ?, skills_selected = ? WHERE user_id = ?";
+        db.run(profileSql, [education, interestsStr, skillsStr, id], (err) => {
+          if (err) {
+            return res
+              .status(500)
+              .json({ message: "Error updating profile", error: err.message });
+          }
+          res.status(200).json({ message: "Profile updated successfully" });
+        });
+      } else {
+        // Insert new profile
+        const profileSql =
+          "INSERT INTO user_profiles (user_id, education, interests, skills_selected) VALUES (?, ?, ?, ?)";
+        db.run(profileSql, [id, education, interestsStr, skillsStr], (err) => {
+          if (err) {
+            return res
+              .status(500)
+              .json({ message: "Error creating profile", error: err.message });
+          }
+          res.status(200).json({ message: "Profile updated successfully" });
+        });
+      }
+    });
+  });
+});
+
+// --- JOB ACTIONS ---
+
+// Apply to a job
+app.post("/api/user/:id/jobs/:jobId/apply", (req, res) => {
+  const { id, jobId } = req.params;
+
+  // Check if already applied
+  db.get(
+    "SELECT id FROM applied_jobs WHERE user_id = ? AND career_id = ?",
+    [id, jobId],
+    (err, row) => {
+      if (err) {
+        return sendResponse(res, 500, "Database error", null, err.message);
+      }
+
+      if (row) {
+        return sendResponse(res, 400, "You have already applied to this job");
+      }
+
+      // Insert application
+      db.run(
+        "INSERT INTO applied_jobs (user_id, career_id, status) VALUES (?, ?, 'pending')",
+        [id, jobId],
+        function (err) {
+          if (err) {
+            return sendResponse(
+              res,
+              500,
+              "Error applying to job",
+              null,
+              err.message
+            );
+          }
+          sendResponse(res, "success", "Application submitted successfully", {
+            applicationId: this.lastID,
+          });
+        }
+      );
+    }
+  );
+});
+
+// Save a job
+app.post("/api/user/:id/jobs/:jobId/save", (req, res) => {
+  const { id, jobId } = req.params;
+
+  // Check if already saved
+  db.get(
+    "SELECT id FROM saved_careers WHERE user_id = ? AND career_id = ?",
+    [id, jobId],
+    (err, row) => {
+      if (err) {
+        return sendResponse(res, 500, "Database error", null, err.message);
+      }
+
+      if (row) {
+        return sendResponse(res, 400, "Job already saved");
+      }
+
+      // Insert save
+      db.run(
+        "INSERT INTO saved_careers (user_id, career_id) VALUES (?, ?)",
+        [id, jobId],
+        function (err) {
+          if (err) {
+            return sendResponse(
+              res,
+              500,
+              "Error saving job",
+              null,
+              err.message
+            );
+          }
+          sendResponse(res, "success", "Job saved successfully", {
+            savedId: this.lastID,
+          });
+        }
+      );
+    }
+  );
+});
+
+// Unsave a job
+app.delete("/api/user/:id/jobs/:jobId/save", (req, res) => {
+  const { id, jobId } = req.params;
+
+  db.run(
+    "DELETE FROM saved_careers WHERE user_id = ? AND career_id = ?",
+    [id, jobId],
+    function (err) {
+      if (err) {
+        return sendResponse(res, 500, "Error unsaving job", null, err.message);
+      }
+      if (this.changes === 0) {
+        return sendResponse(res, 404, "Job not found in saved list");
+      }
+      sendResponse(res, "success", "Job unsaved successfully");
+    }
+  );
+});
+
+// Share a job
+app.post("/api/user/:id/jobs/:jobId/share", (req, res) => {
+  const { id, jobId } = req.params;
+
+  // Generate unique share token
+  const shareToken = crypto.randomBytes(16).toString("hex");
+  const shareUrl = `${BASE_URL}/share/job/${shareToken}`;
+
+  // Check if already shared by this user
+  db.get(
+    "SELECT id FROM shared_items WHERE user_id = ? AND item_type = 'job' AND item_id = ?",
+    [id, jobId],
+    (err, row) => {
+      if (err) {
+        return sendResponse(res, 500, "Database error", null, err.message);
+      }
+
+      if (row) {
+        // Get existing token
+        db.get(
+          "SELECT share_token FROM shared_items WHERE id = ?",
+          [row.id],
+          (err, shareRow) => {
+            if (err) {
+              return sendResponse(
+                res,
+                500,
+                "Database error",
+                null,
+                err.message
+              );
+            }
+            const existingUrl = `${BASE_URL}/share/job/${shareRow.share_token}`;
+            return sendResponse(res, "success", "Share URL retrieved", {
+              share_url: existingUrl,
+            });
+          }
+        );
+        return;
+      }
+
+      // Insert share
+      db.run(
+        "INSERT INTO shared_items (user_id, item_type, item_id, share_token) VALUES (?, 'job', ?, ?)",
+        [id, jobId, shareToken],
+        function (err) {
+          if (err) {
+            return sendResponse(
+              res,
+              500,
+              "Error sharing job",
+              null,
+              err.message
+            );
+          }
+          sendResponse(res, "success", "Job shared successfully", {
+            share_url: shareUrl,
+          });
+        }
+      );
+    }
+  );
+});
+
+// Get user's applied/saved jobs
+app.get("/api/user/:id/jobs", (req, res) => {
+  const { id } = req.params;
+  const { status, limit = 20, page = 1 } = req.query;
+  const offset = (page - 1) * limit;
+
+  const appliedJobsQuery = status
+    ? "SELECT aj.*, c.title, c.company, c.location, c.description, c.skills FROM applied_jobs aj JOIN careers c ON aj.career_id = c.id WHERE aj.user_id = ? AND aj.status = ? ORDER BY aj.applied_at DESC LIMIT ? OFFSET ?"
+    : "SELECT aj.*, c.title, c.company, c.location, c.description, c.skills FROM applied_jobs aj JOIN careers c ON aj.career_id = c.id WHERE aj.user_id = ? ORDER BY aj.applied_at DESC LIMIT ? OFFSET ?";
+
+  const appliedParams = status
+    ? [id, status, limit, offset]
+    : [id, limit, offset];
+
+  db.all(appliedJobsQuery, appliedParams, (err, appliedJobs) => {
+    if (err) {
+      return sendResponse(res, 500, "Database error", null, err.message);
+    }
+
+    // Parse skills for each job
+    const parsedAppliedJobs = appliedJobs.map((job) => ({
+      ...job,
+      skills: JSON.parse(job.skills || "[]"),
+    }));
+
+    // Get saved jobs
+    db.all(
+      "SELECT sc.*, c.title, c.company, c.location, c.description, c.skills FROM saved_careers sc JOIN careers c ON sc.career_id = c.id WHERE sc.user_id = ? ORDER BY sc.saved_at DESC",
+      [id],
+      (err, savedJobs) => {
+        if (err) {
+          return sendResponse(res, 500, "Database error", null, err.message);
+        }
+
+        const parsedSavedJobs = savedJobs.map((job) => ({
+          ...job,
+          skills: JSON.parse(job.skills || "[]"),
+        }));
+
+        sendResponse(res, "success", "User jobs retrieved", {
+          applied: parsedAppliedJobs,
+          saved: parsedSavedJobs,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: appliedJobs.length,
+          },
+        });
+      }
+    );
+  });
+});
+
+// --- COURSE ACTIONS ---
+
+// Get all courses
+app.get("/api/courses", (req, res) => {
+  const { search, provider, location, limit = 20, page = 1 } = req.query;
+  const offset = (page - 1) * limit;
+
+  let query = `
+    SELECT c.*, 
+           GROUP_CONCAT(cs.skill) as skills
+    FROM courses c
+    LEFT JOIN course_skills cs ON c.id = cs.course_id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (search) {
+    query +=
+      " AND (c.title LIKE ? OR c.description LIKE ? OR c.provider LIKE ?)";
+    const searchTerm = `%${search}%`;
+    params.push(searchTerm, searchTerm, searchTerm);
+  }
+
+  if (provider) {
+    query += " AND c.provider LIKE ?";
+    params.push(`%${provider}%`);
+  }
+
+  if (location) {
+    query += " AND c.location LIKE ?";
+    params.push(`%${location}%`);
+  }
+
+  query += " GROUP BY c.id ORDER BY c.title LIMIT ? OFFSET ?";
+  params.push(limit, offset);
+
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      return sendResponse(res, 500, "Database error", null, err.message);
+    }
+
+    const courses = rows.map((course) => ({
+      ...course,
+      skills: course.skills ? course.skills.split(",") : [],
+    }));
+
+    sendResponse(res, "success", "Courses retrieved", {
+      courses,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: courses.length,
+      },
+    });
+  });
+});
+
+// Enroll in a course
+app.post("/api/user/:id/courses/:courseId/enroll", (req, res) => {
+  const { id, courseId } = req.params;
+
+  // Check if already enrolled
+  db.get(
+    "SELECT id FROM enrolled_courses WHERE user_id = ? AND course_id = ?",
+    [id, courseId],
+    (err, row) => {
+      if (err) {
+        return sendResponse(res, 500, "Database error", null, err.message);
+      }
+
+      if (row) {
+        return sendResponse(
+          res,
+          400,
+          "You are already enrolled in this course"
+        );
+      }
+
+      // Insert enrollment
+      db.run(
+        "INSERT INTO enrolled_courses (user_id, course_id, status, progress) VALUES (?, ?, 'in-progress', 0)",
+        [id, courseId],
+        function (err) {
+          if (err) {
+            return sendResponse(
+              res,
+              500,
+              "Error enrolling in course",
+              null,
+              err.message
+            );
+          }
+          sendResponse(res, "success", "Enrolled in course successfully", {
+            enrollmentId: this.lastID,
+          });
+        }
+      );
+    }
+  );
+});
+
+// Save a course
+app.post("/api/user/:id/courses/:courseId/save", (req, res) => {
+  const { id, courseId } = req.params;
+
+  // Check if already saved
+  db.get(
+    "SELECT id FROM saved_courses WHERE user_id = ? AND course_id = ?",
+    [id, courseId],
+    (err, row) => {
+      if (err) {
+        return sendResponse(res, 500, "Database error", null, err.message);
+      }
+
+      if (row) {
+        return sendResponse(res, 400, "Course already saved");
+      }
+
+      // Insert save
+      db.run(
+        "INSERT INTO saved_courses (user_id, course_id) VALUES (?, ?)",
+        [id, courseId],
+        function (err) {
+          if (err) {
+            return sendResponse(
+              res,
+              500,
+              "Error saving course",
+              null,
+              err.message
+            );
+          }
+          sendResponse(res, "success", "Course saved successfully", {
+            savedId: this.lastID,
+          });
+        }
+      );
+    }
+  );
+});
+
+// Unsave a course
+app.delete("/api/user/:id/courses/:courseId/save", (req, res) => {
+  const { id, courseId } = req.params;
+
+  db.run(
+    "DELETE FROM saved_courses WHERE user_id = ? AND course_id = ?",
+    [id, courseId],
+    function (err) {
+      if (err) {
+        return sendResponse(
+          res,
+          500,
+          "Error unsaving course",
+          null,
+          err.message
+        );
+      }
+      if (this.changes === 0) {
+        return sendResponse(res, 404, "Course not found in saved list");
+      }
+      sendResponse(res, "success", "Course unsaved successfully");
+    }
+  );
+});
+
+// Share a course
+app.post("/api/user/:id/courses/:courseId/share", (req, res) => {
+  const { id, courseId } = req.params;
+
+  // Generate unique share token
+  const shareToken = crypto.randomBytes(16).toString("hex");
+  const shareUrl = `${BASE_URL}/share/course/${shareToken}`;
+
+  // Check if already shared by this user
+  db.get(
+    "SELECT id FROM shared_items WHERE user_id = ? AND item_type = 'course' AND item_id = ?",
+    [id, courseId],
+    (err, row) => {
+      if (err) {
+        return sendResponse(res, 500, "Database error", null, err.message);
+      }
+
+      if (row) {
+        // Get existing token
+        db.get(
+          "SELECT share_token FROM shared_items WHERE id = ?",
+          [row.id],
+          (err, shareRow) => {
+            if (err) {
+              return sendResponse(
+                res,
+                500,
+                "Database error",
+                null,
+                err.message
+              );
+            }
+            const existingUrl = `${BASE_URL}/share/course/${shareRow.share_token}`;
+            return sendResponse(res, "success", "Share URL retrieved", {
+              share_url: existingUrl,
+            });
+          }
+        );
+        return;
+      }
+
+      // Insert share
+      db.run(
+        "INSERT INTO shared_items (user_id, item_type, item_id, share_token) VALUES (?, 'course', ?, ?)",
+        [id, courseId, shareToken],
+        function (err) {
+          if (err) {
+            return sendResponse(
+              res,
+              500,
+              "Error sharing course",
+              null,
+              err.message
+            );
+          }
+          sendResponse(res, "success", "Course shared successfully", {
+            share_url: shareUrl,
+          });
+        }
+      );
+    }
+  );
+});
+
+// Get user's enrolled/saved courses
+app.get("/api/user/:id/courses", (req, res) => {
+  const { id } = req.params;
+  const { status, limit = 20, page = 1 } = req.query;
+  const offset = (page - 1) * limit;
+
+  const enrolledQuery = status
+    ? `SELECT ec.*, c.title, c.provider, c.location, c.description,
+              GROUP_CONCAT(cs.skill) as skills
+       FROM enrolled_courses ec
+       JOIN courses c ON ec.course_id = c.id
+       LEFT JOIN course_skills cs ON c.id = cs.course_id
+       WHERE ec.user_id = ? AND ec.status = ?
+       GROUP BY ec.id
+       ORDER BY ec.enrolled_at DESC LIMIT ? OFFSET ?`
+    : `SELECT ec.*, c.title, c.provider, c.location, c.description,
+              GROUP_CONCAT(cs.skill) as skills
+       FROM enrolled_courses ec
+       JOIN courses c ON ec.course_id = c.id
+       LEFT JOIN course_skills cs ON c.id = cs.course_id
+       WHERE ec.user_id = ?
+       GROUP BY ec.id
+       ORDER BY ec.enrolled_at DESC LIMIT ? OFFSET ?`;
+
+  const enrolledParams = status
+    ? [id, status, limit, offset]
+    : [id, limit, offset];
+
+  db.all(enrolledQuery, enrolledParams, (err, enrolledCourses) => {
+    if (err) {
+      return sendResponse(res, 500, "Database error", null, err.message);
+    }
+
+    const parsedEnrolled = enrolledCourses.map((course) => ({
+      ...course,
+      skills: course.skills ? course.skills.split(",") : [],
+    }));
+
+    // Get saved courses
+    db.all(
+      `SELECT sc.*, c.title, c.provider, c.location, c.description,
+              GROUP_CONCAT(cs.skill) as skills
+       FROM saved_courses sc
+       JOIN courses c ON sc.course_id = c.id
+       LEFT JOIN course_skills cs ON c.id = cs.course_id
+       WHERE sc.user_id = ?
+       GROUP BY sc.id
+       ORDER BY sc.saved_at DESC`,
+      [id],
+      (err, savedCourses) => {
+        if (err) {
+          return sendResponse(res, 500, "Database error", null, err.message);
+        }
+
+        const parsedSaved = savedCourses.map((course) => ({
+          ...course,
+          skills: course.skills ? course.skills.split(",") : [],
+        }));
+
+        sendResponse(res, "success", "User courses retrieved", {
+          enrolled: parsedEnrolled,
+          saved: parsedSaved,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: parsedEnrolled.length,
+          },
+        });
+      }
+    );
+  });
+});
+
+// --- PROFILE DATA ---
+
+// Get complete profile data
+app.get("/api/user/:id/profile/complete", (req, res) => {
+  const { id } = req.params;
+
+  // Get user info with profile data
+  db.get(
+    `SELECT u.id, u.name, u.email, u.gender, u.birthYear, u.country, u.avatarFile,
+            p.skills_selected, p.completion_percentage
+     FROM users u
+     LEFT JOIN user_profiles p ON u.id = p.user_id
+     WHERE u.id = ?`,
+    [id],
+    (err, user) => {
+      if (err) {
+        return sendResponse(res, 500, "Database error", null, err.message);
+      }
+      if (!user) {
+        return sendResponse(res, 404, "User not found");
+      }
+      
+      // Ensure default values for profile fields
+      if (user.completion_percentage === null || user.completion_percentage === undefined) {
+        user.completion_percentage = 0;
+      }
+      if (user.skills_selected === null || user.skills_selected === undefined) {
+        user.skills_selected = null;
+      }
+
+      // Get applied jobs
+      db.all(
+        `SELECT aj.*, c.title, c.company, c.location, c.description, c.skills
+         FROM applied_jobs aj
+         JOIN careers c ON aj.career_id = c.id
+         WHERE aj.user_id = ?
+         ORDER BY aj.applied_at DESC`,
+        [id],
+        (err, appliedJobs) => {
+          if (err) {
+            return sendResponse(res, 500, "Database error", null, err.message);
+          }
+
+          const parsedApplied = appliedJobs.map((job) => ({
+            ...job,
+            skills: JSON.parse(job.skills || "[]"),
+          }));
+
+          // Get saved jobs
+          db.all(
+            `SELECT sc.*, c.title, c.company, c.location, c.description, c.skills
+             FROM saved_careers sc
+             JOIN careers c ON sc.career_id = c.id
+             WHERE sc.user_id = ?
+             ORDER BY sc.saved_at DESC`,
+            [id],
+            (err, savedJobs) => {
+              if (err) {
+                return sendResponse(
+                  res,
+                  500,
+                  "Database error",
+                  null,
+                  err.message
+                );
+              }
+
+              const parsedSaved = savedJobs.map((job) => ({
+                ...job,
+                skills: JSON.parse(job.skills || "[]"),
+              }));
+
+              // Get enrolled courses
+              db.all(
+                `SELECT ec.*, c.title, c.provider, c.location, c.description,
+                        GROUP_CONCAT(cs.skill) as skills
+                 FROM enrolled_courses ec
+                 JOIN courses c ON ec.course_id = c.id
+                 LEFT JOIN course_skills cs ON c.id = cs.course_id
+                 WHERE ec.user_id = ?
+                 GROUP BY ec.id
+                 ORDER BY ec.enrolled_at DESC`,
+                [id],
+                (err, enrolledCourses) => {
+                  if (err) {
+                    return sendResponse(
+                      res,
+                      500,
+                      "Database error",
+                      null,
+                      err.message
+                    );
+                  }
+
+                  const parsedEnrolled = enrolledCourses.map((course) => ({
+                    ...course,
+                    skills: course.skills ? course.skills.split(",") : [],
+                  }));
+
+                  // Get saved courses
+                  db.all(
+                    `SELECT sc.*, c.title, c.provider, c.location, c.description,
+                            GROUP_CONCAT(cs.skill) as skills
+                     FROM saved_courses sc
+                     JOIN courses c ON sc.course_id = c.id
+                     LEFT JOIN course_skills cs ON c.id = cs.course_id
+                     WHERE sc.user_id = ?
+                     GROUP BY sc.id
+                     ORDER BY sc.saved_at DESC`,
+                    [id],
+                    (err, savedCourses) => {
+                      if (err) {
+                        return sendResponse(
+                          res,
+                          500,
+                          "Database error",
+                          null,
+                          err.message
+                        );
+                      }
+
+                      const parsedSavedCourses = savedCourses.map((course) => ({
+                        ...course,
+                        skills: course.skills ? course.skills.split(",") : [],
+                      }));
+
+                      sendResponse(
+                        res,
+                        "success",
+                        "Complete profile retrieved",
+                        {
+                          user,
+                          appliedJobs: parsedApplied,
+                          savedJobs: parsedSaved,
+                          enrolledCourses: parsedEnrolled,
+                          savedCourses: parsedSavedCourses,
+                        }
+                      );
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Dashboard batch endpoint
+app.get("/api/user/:id/dashboard", (req, res) => {
+  const { id } = req.params;
+
+  // Get all careers
+  db.all("SELECT * FROM careers", [], (err, careers) => {
+    if (err) {
+      return sendResponse(res, 500, "Database error", null, err.message);
+    }
+
+    const parsedCareers = careers.map((career) => ({
+      ...career,
+      skills: JSON.parse(career.skills || "[]"),
+    }));
+
+    // Get all courses with skills
+    db.all(
+      `SELECT c.*, GROUP_CONCAT(cs.skill) as skills
+       FROM courses c
+       LEFT JOIN course_skills cs ON c.id = cs.course_id
+       GROUP BY c.id`,
+      [],
+      (err, courses) => {
+        if (err) {
+          return sendResponse(res, 500, "Database error", null, err.message);
+        }
+
+        const parsedCourses = courses.map((course) => ({
+          ...course,
+          skills: course.skills ? course.skills.split(",") : [],
+        }));
+
+        // Get user's applied job IDs
+        db.all(
+          "SELECT career_id FROM applied_jobs WHERE user_id = ?",
+          [id],
+          (err, appliedRows) => {
+            if (err) {
+              return sendResponse(
+                res,
+                500,
+                "Database error",
+                null,
+                err.message
+              );
+            }
+            const appliedJobIds = new Set(appliedRows.map((r) => r.career_id));
+
+            // Get user's saved job IDs
+            db.all(
+              "SELECT career_id FROM saved_careers WHERE user_id = ?",
+              [id],
+              (err, savedRows) => {
+                if (err) {
+                  return sendResponse(
+                    res,
+                    500,
+                    "Database error",
+                    null,
+                    err.message
+                  );
+                }
+                const savedJobIds = new Set(savedRows.map((r) => r.career_id));
+
+                // Get user's enrolled course IDs
+                db.all(
+                  "SELECT course_id FROM enrolled_courses WHERE user_id = ?",
+                  [id],
+                  (err, enrolledRows) => {
+                    if (err) {
+                      return sendResponse(
+                        res,
+                        500,
+                        "Database error",
+                        null,
+                        err.message
+                      );
+                    }
+                    const enrolledCourseIds = new Set(
+                      enrolledRows.map((r) => r.course_id)
+                    );
+
+                    // Get user's saved course IDs
+                    db.all(
+                      "SELECT course_id FROM saved_courses WHERE user_id = ?",
+                      [id],
+                      (err, savedCourseRows) => {
+                        if (err) {
+                          return sendResponse(
+                            res,
+                            500,
+                            "Database error",
+                            null,
+                            err.message
+                          );
+                        }
+                        const savedCourseIds = new Set(
+                          savedCourseRows.map((r) => r.course_id)
+                        );
+
+                        // Add flags to careers and courses
+                        const careersWithFlags = parsedCareers.map(
+                          (career) => ({
+                            ...career,
+                            isApplied: appliedJobIds.has(career.id),
+                            isSaved: savedJobIds.has(career.id),
+                          })
+                        );
+
+                        const coursesWithFlags = parsedCourses.map(
+                          (course) => ({
+                            ...course,
+                            isEnrolled: enrolledCourseIds.has(course.id),
+                            isSaved: savedCourseIds.has(course.id),
+                          })
+                        );
+
+                        sendResponse(
+                          res,
+                          "success",
+                          "Dashboard data retrieved",
+                          {
+                            careers: careersWithFlags,
+                            courses: coursesWithFlags,
+                          }
+                        );
+                      }
+                    );
+                  }
+                );
+              }
+            );
+          }
+        );
+      }
+    );
+  });
+});
+
+// Share URL handler
+app.get("/share/:type/:token", (req, res) => {
+  const { type, token } = req.params;
+
+  if (type !== "job" && type !== "course") {
+    return sendResponse(res, 400, "Invalid share type");
+  }
+
+  db.get(
+    "SELECT * FROM shared_items WHERE item_type = ? AND share_token = ?",
+    [type, token],
+    (err, shareItem) => {
+      if (err) {
+        return sendResponse(res, 500, "Database error", null, err.message);
+      }
+
+      if (!shareItem) {
+        return sendResponse(res, 404, "Share link not found or expired");
+      }
+
+      if (type === "job") {
+        db.get(
+          "SELECT * FROM careers WHERE id = ?",
+          [shareItem.item_id],
+          (err, job) => {
+            if (err) {
+              return sendResponse(
+                res,
+                500,
+                "Database error",
+                null,
+                err.message
+              );
+            }
+            if (!job) {
+              return sendResponse(res, 404, "Job not found");
+            }
+            sendResponse(res, "success", "Job details", {
+              ...job,
+              skills: JSON.parse(job.skills || "[]"),
+            });
+          }
+        );
+      } else {
+        db.get(
+          `SELECT c.*, GROUP_CONCAT(cs.skill) as skills
+           FROM courses c
+           LEFT JOIN course_skills cs ON c.id = cs.course_id
+           WHERE c.id = ?
+           GROUP BY c.id`,
+          [shareItem.item_id],
+          (err, course) => {
+            if (err) {
+              return sendResponse(
+                res,
+                500,
+                "Database error",
+                null,
+                err.message
+              );
+            }
+            if (!course) {
+              return sendResponse(res, 404, "Course not found");
+            }
+            sendResponse(res, "success", "Course details", {
+              ...course,
+              skills: course.skills ? course.skills.split(",") : [],
+            });
+          }
+        );
+      }
+    }
+  );
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
+});
+
