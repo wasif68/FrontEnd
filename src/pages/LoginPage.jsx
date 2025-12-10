@@ -11,14 +11,16 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { loginUser, getCurrentUser } from "@/services/authService";
-import { useUserData } from "@/contexts/UserDataContext"; // Import useUserData
+import { useUserData } from "@/contexts/UserDataContext";
+import Toast from "@/components/Toast";
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
   const navigate = useNavigate();
-  const { refreshUserData, setUser } = useUserData(); // Use refreshUserData and setUser from context
+  const { refreshUserData, setUser } = useUserData();
 
   // Redirect if already logged in
   useEffect(() => {
@@ -42,24 +44,77 @@ export default function LoginPage() {
         return;
       }
 
-      // Attempt login using the refactored auth service (API call)
+      // Attempt login using the refactored auth service
+      console.log("🔐 Starting login process...");
       const loggedInUser = await loginUser(form.email, form.password);
-      setUser(loggedInUser); // Set user in context after successful login (this also calls refreshUserData internally)
-      // Note: refreshUserData is called automatically by setUser, so we don't need to call it again
-      navigate("/dashboard", { replace: true });
+      console.log("✅ Login successful! User:", loggedInUser);
+
+      // Verify user object has required fields
+      if (!loggedInUser || (!loggedInUser.email && !loggedInUser.name)) {
+        throw new Error("Invalid user data received from server.");
+      }
+
+      // Verify user is stored in localStorage
+      const storedUser = getCurrentUser();
+      if (!storedUser) {
+        console.error("❌ User not found in localStorage after login!");
+        throw new Error("Failed to store user session.");
+      }
+      console.log("✅ User confirmed in localStorage:", storedUser);
+
+      // Set user in context (with error handling)
+      try {
+        console.log("🔄 Setting user in context...");
+        setUser(loggedInUser);
+        console.log("✅ User set in context");
+      } catch (contextError) {
+        console.error(
+          "⚠️ Error setting user in context (non-blocking):",
+          contextError
+        );
+        // Don't throw - navigation should still happen if user is in localStorage
+      }
+
+      // Show success toast immediately for user feedback
+      setToast({
+        message: "Login successful! Redirecting to dashboard...",
+        type: "success",
+      });
+      setLoading(false); // Stop loading state to show success
+
+      // Ensure user is definitely in localStorage before navigating
+      const finalCheck = getCurrentUser();
+      if (!finalCheck) {
+        throw new Error("Failed to store user session.");
+      }
+
+      // Navigate after a brief delay to show success message
+      // This gives visual feedback and ensures ProtectedRoute can detect the user
+      console.log("🚀 Navigating to dashboard...");
+      setTimeout(() => {
+        navigate("/dashboard", { replace: true });
+        console.log("✅ Navigation called");
+      }, 600); // 600ms - enough to see success message, short enough to feel instant
     } catch (err) {
       console.error("Login error:", err);
-      setError(
+      const errorMessage =
         err.message ||
-          "An unexpected error occurred during login. Please try again."
-      );
-    } finally {
+        "An unexpected error occurred during login. Please try again.";
+      setError(errorMessage);
+      setToast({ message: errorMessage, type: "error" });
       setLoading(false);
     }
   };
 
   return (
     <div className="app-shell auth-shell">
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
       <div className="app-body auth-page">
         <div className="app-main">
           <div className="card">
@@ -113,9 +168,7 @@ export default function LoginPage() {
                 </button>
               </div>
               <div style={{ textAlign: "center", marginTop: 12 }}>
-                <span className="text-muted">
-                  Don't have an account?{" "}
-                </span>
+                <span className="text-muted">Don't have an account? </span>
                 <Link className="link" to="/signup">
                   Sign up
                 </Link>

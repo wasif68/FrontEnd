@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "@/services/authService";
+import Toast from "@/components/Toast";
 
 export default function SignupPage() {
   const [form, setForm] = useState({
@@ -21,6 +22,7 @@ export default function SignupPage() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -52,29 +54,44 @@ export default function SignupPage() {
         return;
       }
 
-      // Attempt registration using the refactored auth service (API call)
+      // Attempt registration using the refactored auth service
       await registerUser({
         name: form.name,
         email: form.email,
         password: form.password,
       });
 
-      // On successful registration, navigate to login
-      // The backend doesn't auto-login on register, so user needs to log in
-      navigate("/login");
+      // Show success toast
+      setToast({
+        message: "Account created successfully! Redirecting to login...",
+        type: "success",
+      });
+      setLoading(false);
+
+      // Small delay to show success message, then navigate to login
+      setTimeout(() => {
+        navigate("/login");
+      }, 1000);
     } catch (err) {
       console.error("Registration error:", err);
-      setError(
+      const errorMessage =
         err.message ||
-          "An unexpected error occurred during registration. Please try again."
-      );
-    } finally {
+        "An unexpected error occurred during registration. Please try again.";
+      setError(errorMessage);
+      setToast({ message: errorMessage, type: "error" });
       setLoading(false);
     }
   };
 
   return (
     <div className="app-shell auth-shell">
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
       <div className="app-body auth-page">
         <div className="app-main">
           <div className="card">
@@ -150,9 +167,7 @@ export default function SignupPage() {
                 </button>
               </div>
               <div style={{ textAlign: "center", marginTop: 12 }}>
-                <span className="text-muted">
-                  Already have an account?{" "}
-                </span>
+                <span className="text-muted">Already have an account? </span>
                 <Link className="link" to="/login">
                   Login
                 </Link>

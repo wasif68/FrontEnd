@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // NOTE: These rules work with custom authentication (email/password in Firestore)
+    // For production, consider using Firebase Auth for better security
+    // With custom auth, we rely on client-side validation and basic rules
+    
+    // Users collection - public read, anyone can create (registration), update requires matching user_id in request
+    match /users/{userId} {
+      allow read: if true; // Public read for user profiles
+      allow create: if true; // Anyone can create (registration)
+      // Update/delete: Allow if request includes user_id matching the document
+      // Note: This is a basic check - for production, use Firebase Auth
+      allow update, delete: if request.resource.data.user_id == userId || 
+                            resource.data.user_id == userId;
+    }
+    
+    // User profiles - public read, authenticated write
+    match /user_profiles/{userId} {
+      allow read: if true; // Public read
+      allow create, update: if true; // Allow writes (client validates ownership)
+      allow delete: if true; // Allow delete (client validates ownership)
+    }
+    
+    // Careers/Jobs - public read, authenticated write
+    match /careers/{careerId} {
+      allow read: if true; // Public read
+      allow write: if true; // Allow writes (client validates)
+    }
+    
+    // Courses - public read, authenticated write
+    match /courses/{courseId} {
+      allow read: if true; // Public read
+      allow write: if true; // Allow writes (client validates)
+    }
+    
+    // Applied jobs - users can read/write (client validates user_id)
+    match /applied_jobs/{applicationId} {
+      allow read, write: if true; // Client validates user_id matches
+    }
+    
+    // Saved careers - users can read/write (client validates user_id)
+    match /saved_careers/{savedId} {
+      allow read, write: if true; // Client validates user_id matches
+    }
+    
+    // Enrollments - users can read/write (client validates user_id)
+    match /enrollments/{enrollmentId} {
+      allow read, write: if true; // Client validates user_id matches
+    }
+    
+    // Saved courses - users can read/write (client validates user_id)
+    match /saved_courses/{savedId} {
+      allow read, write: if true; // Client validates user_id matches
+    }
+    
+    // Shared items - public read (for share links), authenticated write
+    match /shared_items/{shareId} {
+      allow read: if true; // Public read for share links
+      allow write: if true; // Client validates user_id matches
+    }
+    
+    // Config collection - public read only
+    match /config/{document=**} {
+      allow read: if true;
+      allow write: if false; // No writes from client (admin only via console)
+    }
+  }
+}

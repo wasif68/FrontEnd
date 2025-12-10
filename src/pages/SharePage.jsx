@@ -1,15 +1,22 @@
 /**
  * Share Page
- * 
+ *
  * Displays shared job or course details based on share token
  */
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { db } from "@/config/firebase";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import "./SharePage.css";
-
-const API_URL = "http://localhost:3100/api";
 
 export default function SharePage() {
   const { type, token } = useParams();
@@ -22,14 +29,50 @@ export default function SharePage() {
     const loadSharedItem = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${API_URL}/share/${type}/${token}`);
-        
-        if (!response.ok) {
+
+        if (type !== "job" && type !== "course") {
+          throw new Error("Invalid share type");
+        }
+
+        // Find the shared item by token
+        const sharedItemsRef = collection(db, "shared_items");
+        const q = query(
+          sharedItemsRef,
+          where("item_type", "==", type),
+          where("share_token", "==", token)
+        );
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
           throw new Error("Share link not found or expired");
         }
 
-        const data = await response.json();
-        setItem(data.data || data);
+        const shareItem = querySnapshot.docs[0].data();
+
+        // Get the actual item (job or course)
+        if (type === "job") {
+          const jobDoc = await getDoc(
+            doc(db, "careers", shareItem.item_id.toString())
+          );
+          if (!jobDoc.exists()) {
+            throw new Error("Job not found");
+          }
+          setItem({
+            ...jobDoc.data(),
+            id: jobDoc.id,
+          });
+        } else {
+          const courseDoc = await getDoc(
+            doc(db, "courses", shareItem.item_id.toString())
+          );
+          if (!courseDoc.exists()) {
+            throw new Error("Course not found");
+          }
+          setItem({
+            ...courseDoc.data(),
+            id: courseDoc.id,
+          });
+        }
       } catch (err) {
         console.error("Error loading shared item:", err);
         setError(err.message || "Failed to load shared item");
@@ -76,7 +119,7 @@ export default function SharePage() {
       <div className="share-page-container">
         <div className="shared-item-card">
           <h1 className="item-title">{item.title}</h1>
-          
+
           {type === "job" ? (
             <>
               <p className="item-company">{item.company}</p>
@@ -135,4 +178,3 @@ export default function SharePage() {
     </ErrorBoundary>
   );
 }
-

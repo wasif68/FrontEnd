@@ -1,17 +1,46 @@
 /**
- * Authentication Service (Backend API Only)
+ * Authentication Service (Firestore Direct)
  *
- * This file handles user authentication using the backend API.
- * Session management is handled using localStorage.
+ * Handles user authentication using Firestore directly (no backend needed)
  */
 
-// The base URL of our backend API
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3100/api";
+import { db } from "@/config/firebase";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 
 /**
- * Registers a new user by sending a request to the backend API.
+ * Simple password hashing using Web Crypto API (browser-compatible)
+ * NOTE: For production, consider using Firebase Auth instead
+ */
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Verify password against hash
+ */
+async function verifyPassword(password, hash) {
+  const passwordHash = await hashPassword(password);
+  return passwordHash === hash;
+}
+
+/**
+ * Registers a new user in Firestore.
  * @param {object} userData - Contains name, email, and password.
- * @returns {Promise<object>} - The JSON response from the server.
+ * @returns {Promise<object>} - The user object with ID.
  */
 export const registerUser = async (userData) => {
   const { name, email, password } = userData;
@@ -20,33 +49,106 @@ export const registerUser = async (userData) => {
     throw new Error("Name, email, and password are required.");
   }
 
-  const response = await fetch(`${API_URL}/register`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name, email, password }),
-  });
+  try {
+    // Check if user already exists
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("email", "==", email));
+    const querySnapshot = await getDocs(q);
 
-  if (!response.ok) {
-    let errorMessage = "Failed to register";
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorMessage;
-    } catch (e) {
-      errorMessage = response.statusText || errorMessage;
+    if (!querySnapshot.empty) {
+      throw new Error("User with this email already exists.");
     }
-    throw new Error(errorMessage);
-  }
 
-  return response.json();
+    // Hash the password (simple SHA-256 hash)
+    // NOTE: For production, use Firebase Auth instead of custom password handling
+    const hashedPassword = await hashPassword(password);
+
+    // Create user document
+    const userRef = doc(collection(db, "users"));
+    await setDoc(userRef, {
+      name,
+      email,
+      password: hashedPassword,
+      createdAt: serverTimestamp(),
+    });
+
+    const userId = userRef.id;
+
+    // Initialize empty user profile
+    await setDoc(doc(db, "user_profiles", userId), {
+      user_id: userId,
+      education: null,
+      interests: [],
+      skills_selected: [],
+      completion_percentage: 0,
+    });
+
+    // Return user object (without password)
+    // Ensure user object has required fields (email or name) for getCurrentUser() validation
+    const user = {
+      id: userId,
+      name,
+      email,
+    };
+
+    // Verify user object structure
+    if (!user.email && !user.name) {
+      throw new Error("User object missing required fields (email or name).");
+    }
+
+    // Store in localStorage
+    localStorage.setItem("currentUser", JSON.stringify(user));
+    console.log("💾 User registered and stored in localStorage:", {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    });
+
+    // Verify storage was successful
+    const verifyUser = JSON.parse(localStorage.getItem("currentUser"));
+    if (!verifyUser || (!verifyUser.email && !verifyUser.name)) {
+      console.error("❌ Failed to verify user storage!");
+      throw new Error("Failed to store user session.");
+    }
+    console.log("✅ User storage verified");
+
+    return user;
+  } catch (error) {
+    console.error("Registration failed:", error);
+    console.error("Error code:", error.code);
+    console.error("Error message:", error.message);
+    console.error("Full error:", JSON.stringify(error, null, 2));
+
+    // Handle specific Firestore errors
+    if (error.code === "permission-denied") {
+      throw new Error("Permission denied. Please check Firestore rules.");
+    } else if (
+      error.code === "unavailable" ||
+      error.code === "failed-precondition"
+    ) {
+      throw new Error(
+        "Cannot connect to database. Please check your internet connection and ensure Firestore is enabled."
+      );
+    } else if (
+      error.message?.includes("index") ||
+      error.code === "failed-precondition"
+    ) {
+      throw new Error(
+        "Database index required. Please create an index on 'users.email' in Firebase Console."
+      );
+    } else if (error.code === "already-exists") {
+      throw new Error("User with this email already exists.");
+    }
+
+    throw new Error(error.message || "Failed to register. Please try again.");
+  }
 };
 
 /**
- * Logs in a user by authenticating against the backend API.
+ * Logs in a user by authenticating against Firestore.
  * @param {string} email - User's email.
  * @param {string} password - User's password.
- * @returns {Promise<object>} - The user object from the server.
+ * @returns {Promise<object>} - The user object.
  */
 export const loginUser = async (email, password) => {
   if (!email || !password) {
@@ -54,50 +156,87 @@ export const loginUser = async (email, password) => {
   }
 
   try {
-    const response = await fetch(`${API_URL}/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
+    // Find user by email
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("email", "==", email));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      throw new Error("Invalid credentials.");
+    }
+
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data();
+
+    // Check if password field exists
+    if (!userData.password) {
+      throw new Error("Invalid credentials.");
+    }
+
+    // Verify password
+    const isMatch = await verifyPassword(password, userData.password);
+    if (!isMatch) {
+      throw new Error("Invalid credentials.");
+    }
+
+    // Don't send password back
+    const user = {
+      id: userDoc.id,
+      name: userData.name,
+      email: userData.email,
+      gender: userData.gender || null,
+      birthYear: userData.birthYear || null,
+      country: userData.country || null,
+      avatarFile: userData.avatarFile || null,
+    };
+
+    // Verify user object has required fields (email or name) for getCurrentUser() validation
+    if (!user.email && !user.name) {
+      throw new Error("User object missing required fields (email or name).");
+    }
+
+    // Store user data in localStorage
+    localStorage.setItem("currentUser", JSON.stringify(user));
+    console.log("💾 User stored in localStorage:", {
+      id: user.id,
+      email: user.email,
+      name: user.name,
     });
 
-    if (!response.ok) {
-      let errorMessage = "Invalid credentials";
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorMessage;
-      } catch (e) {
-        // If response is not JSON, check for network/server errors
-        if (response.status === 0 || response.status >= 500) {
-          errorMessage = "Server error. Please make sure the backend server is running on port 3100.";
-        } else if (response.status === 404) {
-          errorMessage = "Login endpoint not found. Please check the backend server.";
-        } else {
-          errorMessage = `Login failed (${response.status}). Please try again.`;
-        }
-      }
-      throw new Error(errorMessage);
+    // Verify storage was successful
+    const verifyUser = JSON.parse(localStorage.getItem("currentUser"));
+    if (!verifyUser || (!verifyUser.email && !verifyUser.name)) {
+      console.error("❌ Failed to verify user storage!");
+      throw new Error("Failed to store user session.");
     }
+    console.log("✅ User storage verified");
 
-    const data = await response.json();
-
-    if (data.user && data.user.id) {
-      // Store user data and JWT token
-      localStorage.setItem("currentUser", JSON.stringify(data.user));
-      if (data.token) {
-        localStorage.setItem("authToken", data.token);
-      }
-      return data.user;
-    } else {
-      throw new Error("Login failed: Invalid user data received from server.");
-    }
+    return user;
   } catch (error) {
     console.error("Login failed:", error);
-    // Handle network errors (fetch failures)
-    if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      throw new Error("Cannot connect to the server. Please make sure the backend server is running on http://localhost:3100");
+    console.error("Error code:", error.code);
+    console.error("Error message:", error.message);
+    console.error("Full error:", JSON.stringify(error, null, 2));
+
+    // Handle specific Firestore errors
+    if (error.code === "permission-denied") {
+      throw new Error("Permission denied. Please check Firestore rules.");
+    } else if (
+      error.code === "unavailable" ||
+      error.code === "failed-precondition"
+    ) {
+      throw new Error(
+        "Cannot connect to database. Please check your internet connection and ensure Firestore is enabled."
+      );
+    } else if (
+      error.message?.includes("index") ||
+      error.code === "failed-precondition"
+    ) {
+      throw new Error(
+        "Database index required. Please create an index on 'users.email' in Firebase Console."
+      );
     }
+
     throw new Error(
       error.message || "Failed to log in. Please check your credentials."
     );

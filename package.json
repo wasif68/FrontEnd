@@ -13,6 +13,7 @@
     "serve": "vite preview --host"
   },
   "dependencies": {
+    "firebase": "^11.1.0",
     "kill-port": "^2.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

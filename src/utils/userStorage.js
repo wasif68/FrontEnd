@@ -1,14 +1,14 @@
 /**
- * User Profile Service (Enhanced with localStorage fallback)
+ * User Profile Service (Firestore Direct)
  *
- * This file handles updating user profile data with backend API and localStorage fallback.
+ * This file handles updating user profile data using Firestore directly.
  * Supports profilePictures array for album system.
  */
 
 import { getCurrentUser } from "../services/authService";
+import { db } from "@/config/firebase";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { saveProfile } from "./storage";
-
-const API_URL = "http://localhost:3100/api";
 
 /**
  * Loads a user's profile JSON data from the backend or localStorage.
@@ -18,35 +18,66 @@ const API_URL = "http://localhost:3100/api";
  */
 export const loadUserJson = async (userIdentifier, useId = false) => {
   try {
-    // If useId is true, use ID-based endpoint; otherwise use name-based localStorage
-    if (useId && typeof userIdentifier === "number") {
-      // Try backend first with ID
-      const response = await fetch(`${API_URL}/user/${userIdentifier}/profile`);
-      if (response.ok) {
-        return await response.json();
-      }
-      if (response.status === 404) {
-        // Try localStorage fallback with name (if we have it)
-        const currentUser = getCurrentUser();
-        if (currentUser && currentUser.name) {
-          const localData = localStorage.getItem(
-            `user_json_${currentUser.name}`
+    // If useId is true, use ID-based Firestore lookup
+    if (
+      useId &&
+      (typeof userIdentifier === "string" || typeof userIdentifier === "number")
+    ) {
+      try {
+        // Load user from Firestore
+        const userDoc = await getDoc(
+          doc(db, "users", userIdentifier.toString())
+        );
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+
+          // Load profile from Firestore
+          const profileDoc = await getDoc(
+            doc(db, "user_profiles", userIdentifier.toString())
           );
-          if (localData) {
-            try {
-              return JSON.parse(localData);
-            } catch (e) {
-              console.error("Error parsing user JSON from localStorage:", e);
-              return null;
-            }
+          const profileData = profileDoc.exists()
+            ? profileDoc.data()
+            : {
+                education: null,
+                interests: [],
+                skills_selected: [],
+                completion_percentage: 0,
+              };
+
+          // Return combined user data in expected format
+          return {
+            full_name: userData.name,
+            email_address: userData.email,
+            gender: userData.gender || "",
+            country: userData.country || "",
+            year: userData.birthYear || "",
+            education: profileData.education || "",
+            interests: profileData.interests || [],
+            skills: profileData.skills_selected || [],
+            bio: profileData.bio || "",
+            profile_picture: userData.avatarFile || "",
+          };
+        }
+      } catch (error) {
+        console.warn("Error loading from Firestore:", error);
+      }
+
+      // Fallback to localStorage
+      const currentUser = getCurrentUser();
+      if (currentUser && currentUser.name) {
+        const localData = localStorage.getItem(`user_json_${currentUser.name}`);
+        if (localData) {
+          try {
+            return JSON.parse(localData);
+          } catch (e) {
+            console.error("Error parsing user JSON from localStorage:", e);
+            return null;
           }
         }
-        return null;
       }
-      throw new Error(`Failed to load user profile: ${response.statusText}`);
+      return null;
     } else {
-      // Legacy: Try backend with name (may not work if backend expects ID)
-      // Try localStorage fallback
+      // Legacy: Try localStorage with name
       const localData = localStorage.getItem(`user_json_${userIdentifier}`);
       if (localData) {
         try {
@@ -59,7 +90,7 @@ export const loadUserJson = async (userIdentifier, useId = false) => {
       return null;
     }
   } catch (error) {
-    console.warn("Backend not available, using localStorage:", error.message);
+    console.warn("Error loading user data:", error.message);
     // Fallback to localStorage
     const currentUser = getCurrentUser();
     const name =
@@ -103,63 +134,77 @@ export const updateUserProfile = async (
 
   // Always save to localStorage first (immediate save)
   try {
-      localStorage.setItem(storageKey, JSON.stringify(profileData));
-      
-      // If name changed, remove old storage
-      if (oldName && oldName !== userName) {
-        localStorage.removeItem(`user_json_${oldName}`);
-      }
-      
+    localStorage.setItem(storageKey, JSON.stringify(profileData));
+
+    // If name changed, remove old storage
+    if (oldName && oldName !== userName) {
+      localStorage.removeItem(`user_json_${oldName}`);
+    }
+
     // Update currentUser in localStorage
-      const updatedUser = {
-        ...currentUser,
-        name: userName,
+    const updatedUser = {
+      ...currentUser,
+      name: userName,
       avatar:
         profileData.profile_picture?.replace("Faces/", "") ||
         currentUser.avatar,
-        avatarFile: profileData.profile_picture || currentUser.avatarFile,
-      };
-      localStorage.setItem("currentUser", JSON.stringify(updatedUser));
+      avatarFile: profileData.profile_picture || currentUser.avatarFile,
+    };
+    localStorage.setItem("currentUser", JSON.stringify(updatedUser));
   } catch (error) {
     console.error("Error saving to localStorage:", error);
     throw new Error("Failed to save profile to local storage");
   }
 
-  // Try backend in background (completely fire-and-forget, non-blocking)
-  if (currentUser.id && API_URL) {
+  // Save to Firestore in background (non-blocking)
+  if (currentUser.id) {
     // Don't await - fire and forget
     (async () => {
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 500); // Very short timeout
+        // Update user document
+        const userUpdate = {};
+        if (profileData.full_name) userUpdate.name = profileData.full_name;
+        if (profileData.profile_picture)
+          userUpdate.avatarFile = profileData.profile_picture;
+        if (profileData.gender) userUpdate.gender = profileData.gender;
+        if (profileData.country) userUpdate.country = profileData.country;
+        if (profileData.year) userUpdate.birthYear = parseInt(profileData.year);
 
-        const response = await fetch(
-          `${API_URL}/user/${currentUser.id}/profile`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(profileData),
-            signal: controller.signal,
-          }
-        );
-
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Profile saved to backend successfully");
-        }
-      } catch (error) {
-        // Silently fail - already saved to localStorage
-        // Don't log abort errors
-        if (error.name !== "AbortError") {
-          console.warn(
-            "Backend not available, using localStorage only:",
-            error.message
+        if (Object.keys(userUpdate).length > 0) {
+          await setDoc(
+            doc(db, "users", currentUser.id),
+            { ...userUpdate, updatedAt: serverTimestamp() },
+            { merge: true }
           );
         }
+
+        // Update user profile
+        await setDoc(
+          doc(db, "user_profiles", currentUser.id),
+          {
+            user_id: currentUser.id,
+            education: profileData.education || null,
+            interests: Array.isArray(profileData.interests)
+              ? profileData.interests
+              : [],
+            skills_selected: Array.isArray(profileData.skills)
+              ? profileData.skills
+              : [],
+            bio: profileData.bio || null,
+            recommendations_selected: Array.isArray(
+              profileData.recommendations_selected
+            )
+              ? profileData.recommendations_selected
+              : [],
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        console.log("Profile saved to Firestore successfully");
+      } catch (error) {
+        // Silently fail - already saved to localStorage
+        console.warn("Error saving to Firestore:", error.message);
       }
     })();
   }
@@ -191,7 +236,7 @@ export const saveUserDataDual = async (
     const existingIndex = profileData.profilePictures.findIndex(
       (pic) => pic.path === profileData.profile_picture
     );
-    
+
     // Mark all as not profile
     profileData.profilePictures.forEach((pic) => {
       pic.isProfile = false;
@@ -232,17 +277,17 @@ export const saveUserDataDual = async (
 
   // Save to backend/localStorage (non-blocking)
   try {
-  const result = await updateUserProfile(completeData, oldName, oldImagePath);
-  
-  // Also save to generic profile storage for compatibility
+    const result = await updateUserProfile(completeData, oldName, oldImagePath);
+
+    // Also save to generic profile storage for compatibility
     try {
-  saveProfile(completeData);
+      saveProfile(completeData);
     } catch (error) {
       console.warn("Error saving to generic profile storage:", error);
       // Continue - main save already succeeded
     }
-  
-  return result;
+
+    return result;
   } catch (error) {
     console.error("Error in updateUserProfile:", error);
     // Still try to save to generic profile storage

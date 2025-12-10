@@ -12,6 +12,8 @@ import React, {
   useCallback,
   useEffect,
 } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/config/firebase";
 import { getCurrentUser } from "@/services/authService";
 import { getUserJobs } from "@/services/jobService";
 import { getUserCourses } from "@/services/courseService";
@@ -19,7 +21,7 @@ import { getUserCourses } from "@/services/courseService";
 const UserDataContext = createContext();
 
 export function UserDataProvider({ children }) {
-  const [user, setUser] = useState(() => getCurrentUser());
+  const [user, setUserState] = useState(() => getCurrentUser());
   const [appliedJobs, setAppliedJobs] = useState(new Set());
   const [savedJobs, setSavedJobs] = useState(new Set());
   const [enrolledCourses, setEnrolledCourses] = useState(new Set());
@@ -29,7 +31,7 @@ export function UserDataProvider({ children }) {
 
   // Function to clear all user-related data
   const clearUserData = useCallback(() => {
-    setUser(null);
+    setUserState(null);
     setAppliedJobs(new Set());
     setSavedJobs(new Set());
     setEnrolledCourses(new Set());
@@ -46,7 +48,7 @@ export function UserDataProvider({ children }) {
       return;
     }
 
-    setUser(currentUser); // Ensure context's user state is up-to-date
+    setUserState(currentUser); // Ensure context's user state is up-to-date
 
     try {
       setLoading(true);
@@ -80,10 +82,47 @@ export function UserDataProvider({ children }) {
     }
   }, []);
 
-  // Load data on mount and whenever the user changes (e.g., after login/logout)
+  // Real-time listener for user document
   useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (!currentUser?.id) {
+      setLoading(false);
+      clearUserData();
+      return;
+    }
+
+    console.log("👂 Setting up real-time listener for user:", currentUser.id);
+
+    // Listen for real-time changes to user document
+    const unsubscribeUser = onSnapshot(
+      doc(db, "users", currentUser.id),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const userData = docSnap.data();
+          const updatedUser = {
+            id: docSnap.id,
+            ...userData,
+          };
+          console.log("🔄 User data updated from Firestore:", updatedUser);
+          setUserState(updatedUser);
+        } else {
+          console.warn("⚠️ User document not found in Firestore");
+        }
+      },
+      (error) => {
+        console.error("❌ Error listening to user document:", error);
+        setError(error.message);
+      }
+    );
+
+    // Also refresh jobs and courses data
     refreshUserData();
-  }, [refreshUserData]);
+
+    // Cleanup listener on unmount
+    return () => {
+      unsubscribeUser();
+    };
+  }, [refreshUserData, clearUserData]);
 
   // Optimistic update functions remain the same...
 
@@ -138,14 +177,43 @@ export function UserDataProvider({ children }) {
   const value = {
     user, // Expose the user object
     setUser: (newUser) => {
-      setUser(newUser);
-      if (newUser) {
-        // If a new user logs in, trigger a refresh of other data
-        // Don't await - let it run in background so it doesn't block navigation
-        refreshUserData().catch((err) => {
-          console.error("Error refreshing user data after login:", err);
-          // Don't throw - allow navigation to proceed even if data refresh fails
-        });
+      try {
+        console.log(
+          "🔄 UserDataContext: Setting user in context:",
+          newUser ? { id: newUser.id, email: newUser.email } : null
+        );
+
+        // Update user state immediately (synchronous)
+        setUserState(newUser);
+        console.log("✅ UserDataContext: User state updated");
+
+        if (newUser) {
+          // If a new user logs in, trigger a refresh of other data
+          // Don't await - let it run in background so it doesn't block navigation
+          console.log(
+            "🔄 UserDataContext: Triggering background data refresh..."
+          );
+          refreshUserData().catch((err) => {
+            console.error(
+              "⚠️ UserDataContext: Error refreshing user data (non-blocking):",
+              err
+            );
+            // Don't throw - allow navigation to proceed even if data refresh fails
+          });
+        } else {
+          // If user is null, clear all data
+          clearUserData();
+        }
+      } catch (error) {
+        console.error(
+          "❌ UserDataContext: Error in setUser (non-blocking):",
+          error
+        );
+        // Don't throw - this should never block navigation
+        // Still try to update user state even if refresh fails
+        if (newUser) {
+          setUserState(newUser);
+        }
       }
     },
     appliedJobs,

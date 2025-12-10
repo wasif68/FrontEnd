@@ -1,10 +1,23 @@
 /**
- * Job Service
- * 
- * Handles all API calls related to job actions (apply, save, share, etc.)
+ * Job Service (Firestore Direct)
+ *
+ * All CRUD operations use Firestore SDK directly - no backend needed!
  */
 
-const API_URL = "http://localhost:3100/api";
+import { db } from "@/config/firebase";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  serverTimestamp,
+  orderBy,
+} from "firebase/firestore";
 
 /**
  * Apply to a job
@@ -14,20 +27,37 @@ const API_URL = "http://localhost:3100/api";
  */
 export const applyToJob = async (userId, jobId) => {
   try {
-    const response = await fetch(`${API_URL}/user/${userId}/jobs/${jobId}/apply`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    // Convert userId to string for consistency
+    const userIdStr = userId.toString();
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || "Failed to apply to job");
+    // Check if already applied
+    const appliedJobsRef = collection(db, "applied_jobs");
+    const existingQuery = query(
+      appliedJobsRef,
+      where("user_id", "==", userIdStr),
+      where("career_id", "==", jobId)
+    );
+    const existingSnapshot = await getDocs(existingQuery);
+
+    if (!existingSnapshot.empty) {
+      throw new Error("You have already applied to this job");
     }
 
-    return data;
+    // Create application
+    const appRef = await addDoc(appliedJobsRef, {
+      user_id: userIdStr,
+      career_id: jobId,
+      status: "pending",
+      applied_at: serverTimestamp(),
+    });
+
+    return {
+      status: "success",
+      message: "Application submitted successfully",
+      data: {
+        applicationId: appRef.id,
+      },
+    };
   } catch (error) {
     console.error("Error applying to job:", error);
     throw error;
@@ -42,20 +72,36 @@ export const applyToJob = async (userId, jobId) => {
  */
 export const saveJob = async (userId, jobId) => {
   try {
-    const response = await fetch(`${API_URL}/user/${userId}/jobs/${jobId}/save`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    // Convert userId to string for consistency
+    const userIdStr = userId.toString();
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || "Failed to save job");
+    // Check if already saved
+    const savedCareersRef = collection(db, "saved_careers");
+    const existingQuery = query(
+      savedCareersRef,
+      where("user_id", "==", userIdStr),
+      where("career_id", "==", jobId)
+    );
+    const existingSnapshot = await getDocs(existingQuery);
+
+    if (!existingSnapshot.empty) {
+      throw new Error("Job already saved");
     }
 
-    return data;
+    // Save job
+    const saveRef = await addDoc(savedCareersRef, {
+      user_id: userIdStr,
+      career_id: jobId,
+      saved_at: serverTimestamp(),
+    });
+
+    return {
+      status: "success",
+      message: "Job saved successfully",
+      data: {
+        savedId: saveRef.id,
+      },
+    };
   } catch (error) {
     console.error("Error saving job:", error);
     throw error;
@@ -70,20 +116,29 @@ export const saveJob = async (userId, jobId) => {
  */
 export const unsaveJob = async (userId, jobId) => {
   try {
-    const response = await fetch(`${API_URL}/user/${userId}/jobs/${jobId}/save`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    // Convert userId to string for consistency
+    const userIdStr = userId.toString();
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || "Failed to unsave job");
+    const savedCareersRef = collection(db, "saved_careers");
+    const querySnapshot = await getDocs(
+      query(
+        savedCareersRef,
+        where("user_id", "==", userIdStr),
+        where("career_id", "==", jobId)
+      )
+    );
+
+    if (querySnapshot.empty) {
+      throw new Error("Job not found in saved list");
     }
 
-    return data;
+    // Delete the saved job document
+    await deleteDoc(querySnapshot.docs[0].ref);
+
+    return {
+      status: "success",
+      message: "Job unsaved successfully",
+    };
   } catch (error) {
     console.error("Error unsaving job:", error);
     throw error;
@@ -98,20 +153,36 @@ export const unsaveJob = async (userId, jobId) => {
  */
 export const shareJob = async (userId, jobId) => {
   try {
-    const response = await fetch(`${API_URL}/user/${userId}/jobs/${jobId}/share`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    const BASE_URL = window.location.origin;
+    const shareToken = crypto.randomUUID().replace(/-/g, "").substring(0, 32);
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || "Failed to share job");
+    // Check if already shared
+    const sharedItemsRef = collection(db, "shared_items");
+    const existingQuery = query(
+      sharedItemsRef,
+      where("user_id", "==", userId),
+      where("item_type", "==", "job"),
+      where("item_id", "==", jobId)
+    );
+    const existingSnapshot = await getDocs(existingQuery);
+
+    if (!existingSnapshot.empty) {
+      const shareDoc = existingSnapshot.docs[0].data();
+      const existingUrl = `${BASE_URL}/#/share/job/${shareDoc.share_token}`;
+      return existingUrl;
     }
 
-    return data.data?.share_url || data.share_url;
+    // Create share
+    await addDoc(sharedItemsRef, {
+      user_id: userId,
+      item_type: "job",
+      item_id: jobId,
+      share_token: shareToken,
+      created_at: serverTimestamp(),
+    });
+
+    const shareUrl = `${BASE_URL}/#/share/job/${shareToken}`;
+    return shareUrl;
   } catch (error) {
     console.error("Error sharing job:", error);
     throw error;
@@ -127,22 +198,90 @@ export const shareJob = async (userId, jobId) => {
 export const getUserJobs = async (userId, options = {}) => {
   try {
     const { status, limit = 20, page = 1 } = options;
-    const params = new URLSearchParams();
-    if (status) params.append('status', status);
-    params.append('limit', limit);
-    params.append('page', page);
 
-    const response = await fetch(`${API_URL}/user/${userId}/jobs?${params.toString()}`);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || "Failed to get user jobs");
+    // Convert userId to string for consistency
+    const userIdStr = userId.toString();
+    console.log("🔍 getUserJobs: Searching for user_id:", userIdStr);
+
+    // Get applied jobs
+    // Note: Using where() only (no orderBy) to avoid requiring composite index
+    // We'll sort in JavaScript instead
+    let appliedQuery = query(
+      collection(db, "applied_jobs"),
+      where("user_id", "==", userIdStr)
+    );
+
+    if (status) {
+      appliedQuery = query(appliedQuery, where("status", "==", status));
     }
 
-    return data.data || data;
+    const appliedSnapshot = await getDocs(appliedQuery);
+    console.log(`📊 Found ${appliedSnapshot.size} applied jobs`);
+    const applied = [];
+
+    for (const appliedDoc of appliedSnapshot.docs) {
+      const data = appliedDoc.data();
+      const careerDoc = await getDoc(
+        doc(db, "careers", data.career_id.toString())
+      );
+      if (careerDoc.exists()) {
+        applied.push({
+          id: appliedDoc.id,
+          career_id: data.career_id,
+          status: data.status,
+          applied_at: data.applied_at?.toDate()?.toISOString(),
+          applied_at_timestamp: data.applied_at?.toDate()?.getTime() || 0, // For sorting
+          ...careerDoc.data(),
+        });
+      }
+    }
+
+    // Sort by applied_at descending (most recent first)
+    applied.sort(
+      (a, b) => (b.applied_at_timestamp || 0) - (a.applied_at_timestamp || 0)
+    );
+
+    // Get saved jobs
+    // Note: Using where() only (no orderBy) to avoid requiring composite index
+    // We'll sort in JavaScript instead
+    const savedSnapshot = await getDocs(
+      query(collection(db, "saved_careers"), where("user_id", "==", userIdStr))
+    );
+    console.log(`📊 Found ${savedSnapshot.size} saved jobs`);
+
+    const saved = [];
+    for (const savedDoc of savedSnapshot.docs) {
+      const data = savedDoc.data();
+      const careerDoc = await getDoc(
+        doc(db, "careers", data.career_id.toString())
+      );
+      if (careerDoc.exists()) {
+        saved.push({
+          id: savedDoc.id,
+          career_id: data.career_id,
+          saved_at: data.saved_at?.toDate()?.toISOString(),
+          saved_at_timestamp: data.saved_at?.toDate()?.getTime() || 0, // For sorting
+          ...careerDoc.data(),
+        });
+      }
+    }
+
+    // Sort by saved_at descending (most recent first)
+    saved.sort(
+      (a, b) => (b.saved_at_timestamp || 0) - (a.saved_at_timestamp || 0)
+    );
+
+    return {
+      applied,
+      saved,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: applied.length,
+      },
+    };
   } catch (error) {
     console.error("Error getting user jobs:", error);
     throw error;
   }
 };
-
