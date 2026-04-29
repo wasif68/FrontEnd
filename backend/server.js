@@ -45,6 +45,7 @@ app.get("/api/careers", (req, res) => {
       skills: JSON.parse(career.skills || "[]"),
     }));
     res.status(200).json(careers);
+    return null;
   });
 });
 
@@ -60,8 +61,12 @@ app.get("/api/profile-fields", (req, res) => {
         message: "Error reading profile fields file",
         error: err.message,
       });
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return null;
     }
     res.status(200).json(JSON.parse(data));
+    return null;
   });
 });
 
@@ -118,9 +123,14 @@ app.post("/api/register", async (req, res) => {
           res
             .status(201)
             .json({ message: "User registered successfully", userId: userId });
+          return null;
         });
+        return null;
       });
+      return null;
     }
+  );
+});
   );
 });
 
@@ -172,7 +182,9 @@ app.post("/api/login", (req, res) => {
         user: userWithoutPassword,
         token: token 
       });
+    return null;
   });
+  return null;
 });
 
 
@@ -201,8 +213,8 @@ app.get("/api/user/:id/profile", (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
     res.status(200).json(row);
+    return null;
   });
-});
 
 // Update User Profile Route
 app.put("/api/user/:id/profile", (req, res) => {
@@ -256,7 +268,9 @@ app.put("/api/user/:id/profile", (req, res) => {
           res.status(200).json({ message: "Profile updated successfully" });
         });
       }
+      return null;
     });
+    return null;
   });
 });
 
@@ -296,8 +310,10 @@ app.post("/api/user/:id/jobs/:jobId/apply", (req, res) => {
           sendResponse(res, "success", "Application submitted successfully", {
             applicationId: this.lastID,
           });
+          return null;
         }
       );
+      return null;
     }
   );
 });
@@ -336,8 +352,10 @@ app.post("/api/user/:id/jobs/:jobId/save", (req, res) => {
           sendResponse(res, "success", "Job saved successfully", {
             savedId: this.lastID,
           });
+          return null;
         }
       );
+      return null;
     }
   );
 });
@@ -357,6 +375,7 @@ app.delete("/api/user/:id/jobs/:jobId/save", (req, res) => {
         return sendResponse(res, 404, "Job not found in saved list");
       }
       sendResponse(res, "success", "Job unsaved successfully");
+      return null;
     }
   );
 });
@@ -399,7 +418,7 @@ app.post("/api/user/:id/jobs/:jobId/share", (req, res) => {
             });
           }
         );
-        return;
+        return null;
       }
 
       // Insert share
@@ -419,8 +438,10 @@ app.post("/api/user/:id/jobs/:jobId/share", (req, res) => {
           sendResponse(res, "success", "Job shared successfully", {
             share_url: shareUrl,
           });
+          return null;
         }
       );
+      return null;
     }
   );
 });
@@ -473,8 +494,10 @@ app.get("/api/user/:id/jobs", (req, res) => {
             total: appliedJobs.length,
           },
         });
+        return null;
       }
     );
+    return null;
   });
 });
 
@@ -532,6 +555,7 @@ app.get("/api/courses", (req, res) => {
         total: courses.length,
       },
     });
+    return null;
   });
 });
 
@@ -573,8 +597,10 @@ app.post("/api/user/:id/courses/:courseId/enroll", (req, res) => {
           sendResponse(res, "success", "Enrolled in course successfully", {
             enrollmentId: this.lastID,
           });
+          return null;
         }
       );
+      return null;
     }
   );
 });
@@ -613,8 +639,10 @@ app.post("/api/user/:id/courses/:courseId/save", (req, res) => {
           sendResponse(res, "success", "Course saved successfully", {
             savedId: this.lastID,
           });
+          return null;
         }
       );
+      return null;
     }
   );
 });
@@ -640,6 +668,7 @@ app.delete("/api/user/:id/courses/:courseId/save", (req, res) => {
         return sendResponse(res, 404, "Course not found in saved list");
       }
       sendResponse(res, "success", "Course unsaved successfully");
+      return null;
     }
   );
 });
@@ -682,7 +711,7 @@ app.post("/api/user/:id/courses/:courseId/share", (req, res) => {
             });
           }
         );
-        return;
+        return null;
       }
 
       // Insert share
@@ -704,6 +733,7 @@ app.post("/api/user/:id/courses/:courseId/share", (req, res) => {
           });
         }
       );
+      return null;
     }
   );
 });
@@ -776,8 +806,10 @@ app.get("/api/user/:id/courses", (req, res) => {
             total: parsedEnrolled.length,
           },
         });
+        return null;
       }
     );
+    return null;
   });
 });
 
@@ -919,6 +951,7 @@ app.get("/api/user/:id/profile/complete", (req, res) => {
                           savedCourses: parsedSavedCourses,
                         }
                       );
+                      return null;
                     }
                   );
                 }
@@ -1111,7 +1144,13 @@ app.get("/share/:type/:token", (req, res) => {
               ...job,
               skills: JSON.parse(job.skills || "[]"),
             });
+            return null;
           }
+        );
+      }
+    }
+  );
+});
         );
       } else {
         db.get(
@@ -1138,6 +1177,7 @@ app.get("/share/:type/:token", (req, res) => {
               ...course,
               skills: course.skills ? course.skills.split(",") : [],
             });
+            return null;
           }
         );
       }

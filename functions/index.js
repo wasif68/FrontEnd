@@ -83,6 +83,7 @@ app.get("/api/profile-fields", async (req, res) => {
       error: err.message,
     });
   }
+  return null;
 });
 
 // User Registration Route
@@ -186,6 +187,7 @@ app.post("/api/login", async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err.message });
   }
+  return null;
 });
 
 // Get User Profile Route
@@ -223,8 +225,10 @@ app.get("/api/user/:id/profile", async (req, res) => {
       skills_selected: JSON.stringify(profile.skills_selected || []),
       completion_percentage: profile.completion_percentage || 0,
     });
+    return null;
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err.message });
+    return null;
   }
 });
 
@@ -292,8 +296,10 @@ app.post("/api/user/:id/jobs/:jobId/apply", async (req, res) => {
     sendResponse(res, "success", "Application submitted successfully", {
       applicationId: appRef.id,
     });
+    return null;
   } catch (err) {
     sendResponse(res, 500, "Error applying to job", null, err.message);
+    return null;
   }
 });
 
@@ -324,8 +330,10 @@ app.post("/api/user/:id/jobs/:jobId/save", async (req, res) => {
     sendResponse(res, "success", "Job saved successfully", {
       savedId: saveRef.id,
     });
+    return null;
   } catch (err) {
     sendResponse(res, 500, "Error saving job", null, err.message);
+    return null;
   }
 });
 
@@ -350,6 +358,8 @@ app.delete("/api/user/:id/jobs/:jobId/save", async (req, res) => {
   } catch (err) {
     sendResponse(res, 500, "Error unsaving job", null, err.message);
   }
+
+  return null;
 });
 
 // Share a job
@@ -391,8 +401,10 @@ app.post("/api/user/:id/jobs/:jobId/share", async (req, res) => {
     sendResponse(res, "success", "Job shared successfully", {
       share_url: shareUrl,
     });
+    return null;
   } catch (err) {
     sendResponse(res, 500, "Error sharing job", null, err.message);
+    return null;
   }
 });
 
@@ -562,8 +574,10 @@ app.post("/api/user/:id/courses/:courseId/enroll", async (req, res) => {
     sendResponse(res, "success", "Enrolled in course successfully", {
       enrollmentId: enrollRef.id,
     });
+    return null;
   } catch (err) {
     sendResponse(res, 500, "Error enrolling in course", null, err.message);
+    return null;
   }
 });
 
@@ -592,8 +606,10 @@ app.post("/api/user/:id/courses/:courseId/save", async (req, res) => {
     sendResponse(res, "success", "Course saved successfully", {
       savedId: saveRef.id,
     });
+    return null;
   } catch (err) {
     sendResponse(res, 500, "Error saving course", null, err.message);
+    return null;
   }
 });
 
@@ -615,8 +631,10 @@ app.delete("/api/user/:id/courses/:courseId/save", async (req, res) => {
 
     await snapshot.docs[0].ref.delete();
     sendResponse(res, "success", "Course unsaved successfully");
+    return null;
   } catch (err) {
     sendResponse(res, 500, "Error unsaving course", null, err.message);
+    return null;
   }
 });
 
@@ -660,6 +678,7 @@ app.post("/api/user/:id/courses/:courseId/share", async (req, res) => {
   } catch (err) {
     sendResponse(res, 500, "Error sharing course", null, err.message);
   }
+  return null;
 });
 
 // Get user's enrolled/saved courses
@@ -789,6 +808,7 @@ app.get("/share/:type/:token", async (req, res) => {
   } catch (err) {
     sendResponse(res, 500, "Database error", null, err.message);
   }
+  return null;
 });
 
 // Export Express app as Firebase Function
